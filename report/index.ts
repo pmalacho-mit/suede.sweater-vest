@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
-import devcontainer from "../../sweater-vest-suede.programmatic-docker-suede/devcontainer.js";
-import { container } from "../../sweater-vest-suede.programmatic-docker-suede";
+import devcontainer from "../sweater-vest-suede.programmatic-docker-suede/devcontainer.js";
+import { container } from "../sweater-vest-suede.programmatic-docker-suede";
 import {
   buildAndRun,
   certificates,
@@ -9,8 +9,8 @@ import {
   type Browser,
   type Forwarded,
   browsers,
-} from "../../sweater-vest-suede.browser-control-container-suede";
-import { cli } from "../../sweater-vest-suede.typescript-cli-suede";
+} from "../sweater-vest-suede.browser-control-container-suede";
+import { cli } from "../sweater-vest-suede.typescript-cli-suede";
 import { startReportServer, type ReportServer } from "./events.ts";
 import { printReport } from "./print.ts";
 import { renderMarkdown } from "./markdown.ts";
@@ -312,7 +312,8 @@ export const generateReport = async (
         network: await devcontainer.network(),
         log: true,
         forward: options.forward ?? [],
-        trustCertificates: options.trustCertificates ?? (await certificates.local()),
+        trustCertificates:
+          options.trustCertificates ?? (await certificates.local()),
         skipIfRunning: true, // can re-use browser container specific to this devcontainer
       });
       await playwright.ready(name);
@@ -384,49 +385,49 @@ const ports = (list: string): Forwarded[] =>
 if (cli.entry(import.meta.url)) {
   const { server, closet, browser, output, test, component, forward, silence } =
     cli(
-    "Run the sweater vest report script.",
-    cli.flag(
-      ["server", "s"],
-      "URL where the development server is running.",
-      defaults.server,
-    ),
-    cli.flag(
-      ["closet", "c"],
-      "Endpoint where Closet.svelte is rendered (relative to the server URL).",
-      defaults.closet,
-    ),
-    cli.flags(
-      ["browser", "b"],
-      "Which browser(s) to run",
-      browsers,
-      defaults.browsers,
-    ),
-    cli.flag(
-      ["output", "o"],
-      "Output path for the Markdown report. Pass an empty string to skip.",
-      defaults.output,
-    ),
-    cli.flag(
-      ["test", "t"],
-      "Only run tests whose name or id matches this pattern.",
-    ),
-    cli.flag(
-      ["component", "m"],
-      "Only open components whose path matches this pattern.",
-    ),
-    cli.flag(
-      ["forward", "f"],
-      "Ports to publish on the browser's localhost, comma separated, so that " +
-        "pages served from them are trustworthy origins.",
-      "",
-    ),
-    cli.flag(
-      ["silence", "w"],
-      "Seconds a run may go without a word from any browser before it is " +
-        "given up on.",
-      0,
-    ),
-  );
+      "Run the sweater vest report script.",
+      cli.flag(
+        ["server", "s"],
+        "URL where the development server is running.",
+        defaults.server,
+      ),
+      cli.flag(
+        ["closet", "c"],
+        "Endpoint where Closet.svelte is rendered (relative to the server URL).",
+        defaults.closet,
+      ),
+      cli.flags(
+        ["browser", "b"],
+        "Which browser(s) to run",
+        browsers,
+        defaults.browsers,
+      ),
+      cli.flag(
+        ["output", "o"],
+        "Output path for the Markdown report. Pass an empty string to skip.",
+        defaults.output,
+      ),
+      cli.flag(
+        ["test", "t"],
+        "Only run tests whose name or id matches this pattern.",
+      ),
+      cli.flag(
+        ["component", "m"],
+        "Only open components whose path matches this pattern.",
+      ),
+      cli.flag(
+        ["forward", "f"],
+        "Ports to publish on the browser's localhost, comma separated, so that " +
+          "pages served from them are trustworthy origins.",
+        "",
+      ),
+      cli.flag(
+        ["silence", "w"],
+        "Seconds a run may go without a word from any browser before it is " +
+          "given up on.",
+        0,
+      ),
+    );
 
   generateReport({
     server,
