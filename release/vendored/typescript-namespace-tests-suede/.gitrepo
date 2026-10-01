@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained automatically
+; by the git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = git@github.com:pmalacho-mit/typescript-namespace-tests-suede.git
+	branch = release
+	commit = 04ef5029530470ad879057571f9e7a487d362ec2
+	parent = 31ca13a77262eac407d6847958021b1f8e074f3a
+	method = merge
+	cmdver = 0.4.9

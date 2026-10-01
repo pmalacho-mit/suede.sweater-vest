@@ -1,45 +1,38 @@
 {
-	"name": "sweater-vest-suede",
-	"private": true,
-	"version": "0.0.1",
-	"type": "module",
-	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
-		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"test:unit": "vitest",
-		"test": "npm run test:unit -- --run",
-		"report": "release/report.sh --closet /tests",
-		"doc": "npx @p-buddy/parkdown@0.0.32",
-		"undoc": "npx @p-buddy/parkdown@0.0.32 --depopulate --no-inclusions",
-		"playwright-cli": "playwright-cli"
-	},
-	"devDependencies": {
-		"@playwright/cli": "^0.1.9",
-		"@sveltejs/adapter-auto": "^7.0.0",
-		"@sveltejs/kit": "^2.47.1",
-		"@sveltejs/vite-plugin-svelte": "^6.2.1",
-		"@vitest/browser-playwright": "^4.0.5",
-		"acorn": "^8.16.0",
-		"playwright": "^1.56.1",
-		"svelte-check": "^4.3.3",
-		"vite": "^7.1.10",
-		"vitest": "^4.0.5",
-		"vitest-browser-svelte": "^2.0.1"
-	},
-	"dependencies": {
-		"@storybook/test": "^8.6.14",
-		"@types/dockerode": "^4.0.1",
-		"@types/node": "^25.9.1",
-		"dockerode": "^5.0.0",
-    "dockview": "^8.1.0",
-		"dockview-core": "^4.11.0",
-		"html-to-image": "^1.11.13",
-		"svelte": "^5.43.5",
-		"tsx": "^4.21.0",
-		"typescript": "~5.9.3"
-	}
+  "name": "sweater-vest-suede",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync || echo ''",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "test:unit": "vitest",
+    "test": "npm run test:unit -- --run",
+    "report": "node release/report/index.ts",
+    "doc": "npx @p-buddy/parkdown@0.0.32",
+    "undoc": "npx @p-buddy/parkdown@0.0.32 --depopulate --no-inclusions"
+  },
+  "devDependencies": {
+    "@playwright/cli": "^0.1.9",
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/adapter-auto": "^7.0.0",
+    "@sveltejs/kit": "^2.47.1",
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@vitest/browser-playwright": "^4.0.5",
+    "acorn": "^8.16.0",
+    "jsdom": "^30.1.1",
+    "svelte-check": "^4.3.3",
+    "vite": "^7.1.10",
+    "vitest": "^4.0.5",
+    "vitest-browser-svelte": "^2.0.1"
+  },
+  "dependencies": {
+    "@types/node": "^25.9.1",
+    "svelte": "^5.43.5",
+    "typescript": "~5.9.3"
+  }
 }

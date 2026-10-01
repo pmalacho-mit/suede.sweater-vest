@@ -1,5 +1,2 @@
-<script lang="ts">
-  import Closet from "$release/Closet.svelte";
-</script>
-
-<Closet glob={import.meta.glob("/src/lib/**/*.test.svelte")} />
+<h1>sweater-vest</h1>
+<p><a href="/vests">Every test snippet, each on a page of its own.</a></p>

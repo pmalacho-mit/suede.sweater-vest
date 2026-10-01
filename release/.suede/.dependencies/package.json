@@ -1,14 +1,15 @@
 {
   "dependencies": {
-    "@storybook/test": "^8.6.14",
-    "@types/dockerode": "^4.0.1",
+    "@jridgewell/sourcemap-codec": "^1.6.0",
+    "@testing-library/svelte": "^5.4.2",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^25.9.1",
-    "dockerode": "^5.0.0",
-    "dockview": "^4.11.0",
-    "dockview-core": "^4.11.0",
-    "html-to-image": "^1.11.13",
-    "svelte": "^5.43.5",
-    "tsx": "^4.21.0",
-    "typescript": "~5.9.3"
+    "@types/picomatch": "^4.0.3",
+    "@typescript/typescript6": "^6.0.2",
+    "@vitest/expect": "^4.0.9",
+    "chai": "^6.2.1",
+    "magic-string": "^1.4.2",
+    "picomatch": "^4.0.7",
+    "playwright": "^1.56.1"
   }
 }
