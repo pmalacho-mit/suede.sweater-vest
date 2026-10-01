@@ -8,10 +8,9 @@ export default defineConfig({
     sveltekit(),
     sweaterVest({
       project: "sweater",
-      // where this container publishes the dev server, for the editor to open pages at
-      ...(process.env.SWEATER_VEST_PORT
-        ? { external: `http://localhost:${process.env.SWEATER_VEST_PORT}` }
-        : {}),
+      external: process.env.SWEATER_VEST_PORT
+        ? `http://localhost:${process.env.SWEATER_VEST_PORT}`
+        : undefined,
     }),
   ],
   server: {

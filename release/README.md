@@ -74,14 +74,15 @@ runs the library's TypeScript directly, so nothing is compiled first.
 
 The options, all optional:
 
-| Option         | What it does                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------------ |
-| `project`      | The Vitest project name(s) that collect components. Every project without it.                          |
-| `exclude`      | Globs discovery skips, relative to the project root. `node_modules` and dot-directories are always skipped. |
-| `extracted`    | The glob for extracted tests, added to Vitest's `include`; `false` leaves them out. Default `**/*.vest.temp.svelte`. |
-| `tsconfig`     | The tsconfig file name, found upward from the working directory. Default `tsconfig.json`.              |
-| `scan`         | Discover components with tests by scanning the working directory. Default `true`.                     |
-| `external`     | Where a browser outside this machine reaches the dev server (a container's published port), for the editor to open pages at. |
+| Option      | What it does                                                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `project`   | The Vitest project name(s) that collect components. Every project without it.                                                |
+| `exclude`   | Globs discovery skips, relative to the project root. `node_modules` and dot-directories are always skipped.                  |
+| `extracted` | The glob for extracted tests, added to Vitest's `include`; `false` leaves them out. Default `**/*.vest.temp.svelte`.         |
+| `tsconfig`  | The tsconfig file name, found upward from the working directory. Default `tsconfig.json`.                                    |
+| `scan`      | Discover components with tests by scanning the working directory. Default `true`.                                            |
+| `external`  | Where a browser outside this machine reaches the dev server (a container's published port), for the editor to open pages at. |
+| `routes`    | SvelteKit's routes directory. Default `src/routes`.                                                                          |
 
 For pages on your dev server, copy a route from [templates](./templates/README.md).
 
@@ -153,15 +154,15 @@ Non-reactive values the markup shares are an `{@const}` inside the snippet.
 Call `test` exactly once, in the snippet's markup, with the body. The body runs
 once the markup is mounted (every `bind:this` is set) and is handed:
 
-| Member                                     | What it is                                                     |
-| ------------------------------------------ | -------------------------------------------------------------- |
-| `expect`                                   | Vitest's                                                       |
-| `user`                                     | a `@testing-library/user-event` session                        |
-| `screen`, `within`, `fireEvent`, `waitFor` | Testing Library's                                              |
-| `flushSync`, `tick`                        | Svelte's                                                       |
-| `note(text)`                               | an annotation, kept with the outcome (a Vitest annotation too) |
+| Member                                     | What it is                                                                                                                     |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `expect`                                   | Vitest's                                                                                                                       |
+| `user`                                     | a `@testing-library/user-event` session                                                                                        |
+| `screen`, `within`, `fireEvent`, `waitFor` | Testing Library's                                                                                                              |
+| `flushSync`, `tick`                        | Svelte's                                                                                                                       |
+| `note(text)`                               | an annotation, kept with the outcome (a Vitest annotation too)                                                                 |
 | `capture(el?, name?)`                      | a PNG of `el` (the page by default), kept with the outcome; a real screenshot, so only under the report — `null` anywhere else |
-| `context`, `vi`                            | Vitest's, when running under Vitest                            |
+| `context`, `vi`                            | Vitest's, when running under Vitest                                                                                            |
 
 A snippet that never calls `test`, or calls it twice, fails saying so.
 
@@ -173,11 +174,11 @@ own around a snippet:
 <p>{test.name}: {test.state}{#if test.error}, {test.error}{/if}</p>
 ```
 
-| Member       | What it is                                       |
-| ------------ | ------------------------------------------------ |
-| `test.name`  | `Counter > counts`                               |
-| `test.state` | `"running"`, then `"passed"` or `"failed"`       |
-| `test.error` | the failure's message, once it has failed        |
+| Member       | What it is                                 |
+| ------------ | ------------------------------------------ |
+| `test.name`  | `Counter > counts`                         |
+| `test.state` | `"running"`, then `"passed"` or `"failed"` |
+| `test.error` | the failure's message, once it has failed  |
 
 ## What works, and where the seams are
 
@@ -186,24 +187,24 @@ written with — Testing Library's own examples, the Svelte docs' testing page,
 and the shapes real component libraries take — each as an example component
 with snippet tests in the repository's `src/lib/examples`:
 
-| Pattern                                             | Example         |
-| --------------------------------------------------- | --------------- |
-| a prop, a click, what appears                       | `Greeter`       |
-| a bindable prop, written back through the binding; keyboard activation | `Counter` |
-| `bind:value` into a pocket; a callback prop         | `TextInput`     |
-| a form: typing, selecting, checking, submitting, validation messages | `Form` |
-| children and a snippet prop, declared inside the test snippet | `Card` |
-| a keyed list driven by a pocket array               | `List`          |
-| `{#await}` with an injected loader settled by the test; `waitFor`, `findBy` | `Async` |
-| an effect with a timer, waited for in real time     | `Clock`         |
-| context, through a provider component imported as a type | `Themed` |
-| a transition in and out                             | `Fade`          |
-| a dialog: focus on open, `svelte:window` Escape to close | `Modal`    |
-| ARIA roles and arrow-key navigation                 | `Tabs`          |
-| a component's exported functions, through the instance in the pocket | `Stopwatch` |
-| shared runes state from a `.svelte.ts` module       | `CartSummary`   |
-| a component's own `<style>`, kept under the snippet | `Card`          |
-| examples only, no body: a page, and a test that they mount | `Badge`   |
+| Pattern                                                                     | Example       |
+| --------------------------------------------------------------------------- | ------------- |
+| a prop, a click, what appears                                               | `Greeter`     |
+| a bindable prop, written back through the binding; keyboard activation      | `Counter`     |
+| `bind:value` into a pocket; a callback prop                                 | `TextInput`   |
+| a form: typing, selecting, checking, submitting, validation messages        | `Form`        |
+| children and a snippet prop, declared inside the test snippet               | `Card`        |
+| a keyed list driven by a pocket array                                       | `List`        |
+| `{#await}` with an injected loader settled by the test; `waitFor`, `findBy` | `Async`       |
+| an effect with a timer, waited for in real time                             | `Clock`       |
+| context, through a provider component imported as a type                    | `Themed`      |
+| a transition in and out                                                     | `Fade`        |
+| a dialog: focus on open, `svelte:window` Escape to close                    | `Modal`       |
+| ARIA roles and arrow-key navigation                                         | `Tabs`        |
+| a component's exported functions, through the instance in the pocket        | `Stopwatch`   |
+| shared runes state from a `.svelte.ts` module                               | `CartSummary` |
+| a component's own `<style>`, kept under the snippet                         | `Card`        |
+| examples only, no body: a page, and a test that they mount                  | `Badge`       |
 
 Every one runs under Vitest and on its page, and a production build of an app
 that uses all of those components (`src/routes/examples`) holds none of their
@@ -236,10 +237,9 @@ The seams, so they are not surprises:
   library does not trim CSS; that warning is the signal that a selector is
   test-only, and the way to quiet it is to move such styles into the snippet's
   own markup or a harness component.
-- **The pages route is yours.** In a production build it carries the page
-  runner's dependencies in its own chunk, loaded only when someone opens it,
-  and shows nothing since only the dev server answers. Leave it out of a
-  production build if you would rather it not exist there at all.
+- **The pages route is left out of builds.** A route that imports the library
+  is renamed out of SvelteKit's sight for the length of a build and restored
+  after. Nothing of the page runner or its dependencies reaches a build.
 
 ## How a test is run
 
@@ -269,7 +269,15 @@ every snippet at `/vests` and renders one at `/vests/<component>/<snippet>`
 there too, live in the browser; the page shows exactly what the snippet wrote,
 and `test.state` is how it says whether it passed. The page asks the dev
 server for the list (`/__sweater-vest/tests.json`, which only the dev server
-answers) and imports each generated component from it, so a build carries no test.
+answers) and imports each generated component from it.
+
+The route is the dev server's alone. In a build, a route whose `+page` or
+`+layout` files import from the library is left out: for the length of the
+build its `+` files are renamed so SvelteKit does not see them, and they are
+put back when the build ends, however it ends. So a static adapter, which
+refuses a dynamic route, builds clean, and no adapter ships a page that could
+show nothing. One thing to keep in mind: a link to that route elsewhere in your
+app is a link to nothing in a build, which a static adapter's crawler reports.
 
 ## The report
 
@@ -285,15 +293,15 @@ npm run report       # terminal 2 → fashion-show.md, captures beside it in fas
 It exits non-zero when a test failed. Browsers come from `playwright`
 (`npx playwright install chromium` once); Docker is not involved.
 
-| Flag                  | Short | What it does                                                              | Default                                  |
-| --------------------- | ----- | ------------------------------------------------------------------------- | ---------------------------------------- |
-| `--server <url>`      | `-s`  | where the dev server is                                                   | `http://localhost:5173` |
-| `--route <path>`      | `-r`  | the route that renders a snippet on a page                                | `/vests`                                 |
-| `--browser <name>`    | `-b`  | `chromium`, `firefox` or `webkit`; repeatable                             | `chromium`                               |
-| `--output <path>`     | `-o`  | the Markdown report; `""` writes nothing                                  | `./fashion-show.md`                      |
-| `--test <pattern>`    | `-t`  | only tests whose name matches, case-insensitively                         | all                                      |
-| `--timeout <seconds>` | `-w`  | how long one page may take to settle                                      | `60`                                     |
-| `--headed`            |       | show the browser                                                          | off                                      |
+| Flag                  | Short | What it does                                      | Default                 |
+| --------------------- | ----- | ------------------------------------------------- | ----------------------- |
+| `--server <url>`      | `-s`  | where the dev server is                           | `http://localhost:5173` |
+| `--route <path>`      | `-r`  | the route that renders a snippet on a page        | `/vests`                |
+| `--browser <name>`    | `-b`  | `chromium`, `firefox` or `webkit`; repeatable     | `chromium`              |
+| `--output <path>`     | `-o`  | the Markdown report; `""` writes nothing          | `./fashion-show.md`     |
+| `--test <pattern>`    | `-t`  | only tests whose name matches, case-insensitively | all                     |
+| `--timeout <seconds>` | `-w`  | how long one page may take to settle              | `60`                    |
+| `--headed`            |       | show the browser                                  | off                     |
 
 The same from code: `generateReport(options)` in [report/index.ts](./report/index.ts)
 returns the runs and the counts.
@@ -335,7 +343,7 @@ else, tell the plugin where, so the editor opens pages at the published
 address:
 
 ```ts
-sweaterVest({ external: `http://localhost:${process.env.SWEATER_VEST_PORT}` })
+sweaterVest({ external: `http://localhost:${process.env.SWEATER_VEST_PORT}` });
 ```
 
 The editor asks the running server for it, so nothing but `vite.config.ts`

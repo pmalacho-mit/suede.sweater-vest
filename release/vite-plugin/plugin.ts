@@ -25,6 +25,7 @@ import {
   testName,
 } from "./names.ts";
 import { CONFIG_ENDPOINT, TESTS_ENDPOINT } from "../endpoints.ts";
+import { routeHider, type Alias } from "./routes.ts";
 
 import type { Plugin, ViteUserConfig } from "vitest/config";
 
@@ -45,6 +46,12 @@ export type Options = {
    * Left out, the editor tunnels to the server's own port.
    */
   external?: string;
+  /**
+   * SvelteKit's routes directory. In a build, a route whose `+` files import
+   * from the library (the pages that render snippets) is left out: its files
+   * are renamed for the length of the build and restored after.
+   */
+  routes?: string;
   /** Also discover the library's own fixtures, which vendoring it must not add to a suite. */
   _scanSelf?: boolean;
 };
@@ -126,9 +133,13 @@ export default function sweaterVest({
   tsconfig = "tsconfig.json",
   scan = true,
   external,
+  routes = "src/routes",
   _scanSelf: scanSelf = false,
 }: Options = {}): Plugin {
   const cwd = process.cwd();
+  const hider = routeHider(path.resolve(cwd, routes), library, (message) =>
+    console.log(`[sweater-vest] ${message}`),
+  );
   const projects = asList(project);
   const componentsUnder = componentFinder(
     cwd,
@@ -198,29 +209,43 @@ export default function sweaterVest({
         })),
     );
 
+  /** What the plugin adds to Vitest's config, for the projects it collects in. */
+  const testConfig = (userConfig: ViteUserConfig): ViteUserConfig => {
+    const name = userConfig.test?.name;
+    if (projects && (typeof name !== "string" || !projects.includes(name)))
+      return {};
+    // every component with a snippet is collected — an example is a test of mounting — and one the
+    // plugin cannot generate still counts, so that its error fails the run instead of hiding it
+    const files = scan
+      ? [...componentsUnder(cwd)]
+          .filter((f) => analysisFor(f).snippets.length > 0)
+          .map((f) => posix(path.relative(cwd, f)))
+      : [];
+    return {
+      test: {
+        includeSource: files,
+        includeTaskLocation: true,
+        server: { deps: { inline: SVELTE_LIBRARIES } },
+        ...includeFor(extracted, userConfig.test?.include),
+      },
+    };
+  };
+
   return {
     name: "sweater-vest",
     enforce: "pre",
 
-    config(userConfig: ViteUserConfig): ViteUserConfig {
-      const name = userConfig.test?.name;
-      if (projects && (typeof name !== "string" || !projects.includes(name)))
-        return {};
-      // every component with a snippet is collected — an example is a test of mounting — and one the
-      // plugin cannot generate still counts, so that its error fails the run instead of hiding it
-      const files = scan
-        ? [...componentsUnder(cwd)]
-            .filter((f) => analysisFor(f).snippets.length > 0)
-            .map((f) => posix(path.relative(cwd, f)))
-        : [];
-      return {
-        test: {
-          includeSource: files,
-          includeTaskLocation: true,
-          server: { deps: { inline: SVELTE_LIBRARIES } },
-          ...includeFor(extracted, userConfig.test?.include),
-        },
-      };
+    // before SvelteKit's own `config`, which scans the routes: ours is enforced first and ordered first
+    config: {
+      order: "pre",
+      handler(
+        userConfig: ViteUserConfig,
+        env: { command: string },
+      ): ViteUserConfig {
+        if (env.command === "build")
+          hider.hide(userConfig.resolve?.alias as Alias | undefined);
+        return testConfig(userConfig);
+      },
     },
 
     configResolved(config) {
