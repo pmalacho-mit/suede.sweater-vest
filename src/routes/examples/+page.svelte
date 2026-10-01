@@ -19,6 +19,8 @@
   import TextInput from "$lib/examples/TextInput.svelte";
   import ThemeProvider from "$lib/examples/ThemeProvider.svelte";
   import Themed from "$lib/examples/Themed.svelte";
+  import Chip from "$lib/showcase/Chip.svelte";
+  import Panel from "$lib/showcase/Panel.svelte";
 
   const cart = new Cart();
   let items = $state(["one", "two"]);
@@ -43,3 +45,5 @@
 <CartSummary {cart} />
 <Badge tone="good">badge</Badge>
 <Example value={1} />
+<Chip label="chip" tone="good" />
+<Panel title="panel" />

@@ -8,9 +8,9 @@ const SKIPPED = new Set(["node_modules", "dist", "out", "coverage", "build"]);
 const isSearchable = (entry: fs.Dirent) => !entry.name.startsWith(".") && !SKIPPED.has(entry.name);
 
 // wherever the library is installed, the DSL keeps its name, the command line sits beside it,
-// and `runtime.svelte.ts` tells it apart from namespace-tests, whose DSL shares the name
+// and `runtimes/common.svelte.ts` tells it apart from namespace-tests, whose DSL shares the name
 const isLibrary = (dir: string) =>
-  ["dsl.import.meta.vitest.ts", "cli.ts", "runtime.svelte.ts"].every((file) =>
+  ["dsl.import.meta.vitest.ts", "cli.ts", path.join("runtimes", "common.svelte.ts")].every((file) =>
     fs.existsSync(path.join(dir, file)),
   );
 

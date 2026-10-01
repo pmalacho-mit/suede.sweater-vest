@@ -128,6 +128,40 @@ Every parameter is handed in by what its type says:
 
 Anything else is an error where it is written, and the run stops.
 
+### Components for tests
+
+The DSL also exports `Sweater`, a namespace of components for writing and
+showing tests. A snippet takes one as `typeof Sweater.<Name>`, and the
+generated test imports the real component; the namespace itself is types, so
+nothing of it reaches a build:
+
+```svelte
+<script lang="ts">
+  import type Self from "./Counter.svelte";
+  import type { Test, Sweater } from "<path>/sweater-vest-suede/dsl.import.meta.vitest";
+</script>
+
+{#snippet shown(Counter: typeof Self, Status: typeof Sweater.Status, Frame: typeof Sweater.Frame, test: Test)}
+  <Status {test} />
+  <Frame><Counter /></Frame>
+  {test(async ({ expect }) => { … })}
+{/snippet}
+```
+
+| Component       | What it is for                                                                        |
+| --------------- | ------------------------------------------------------------------------------------- |
+| `Status`        | the test's name, state, notes and failure: `<Status {test} />`                        |
+| `Inspect`       | a live JSON view of a value, a pocket say: `<Inspect value={pocket} />`               |
+| `Labeled`       | a caption over a variant: `<Labeled label="tone=good">…</Labeled>`                    |
+| `Frame`         | a box sized to its content, with `bind:element` for a `capture` of just the component |
+| `Stage`         | a viewport of a known size, `scroll` and `checkered` optional                         |
+| `Row`, `Column` | variants side by side, or stacked, with `gap` and `align`                             |
+| `Grid`          | a matrix of variants: `<Grid columns={3}>`                                            |
+| `Theme`         | content under `scheme="light"` or `"dark"` (`color-scheme` and `data-theme`)          |
+
+They live in [components/](./components), and `src/lib/showcase` in the
+repository shows each one in a snippet.
+
 ### Pockets
 
 A bare object type is a pocket: a `$state` object the snippet and the body
@@ -179,6 +213,7 @@ own around a snippet:
 | `test.name`  | `Counter > counts`                         |
 | `test.state` | `"running"`, then `"passed"` or `"failed"` |
 | `test.error` | the failure's message, once it has failed  |
+| `test.notes` | every `note` the body wrote so far, reactively |
 
 ## What works, and where the seams are
 

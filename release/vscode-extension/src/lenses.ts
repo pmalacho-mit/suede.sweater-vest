@@ -19,10 +19,15 @@ const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ?
 const collectorLens = (uri: vscode.Uri, tests: DiscoveredTest[]) =>
   lens(TOP, `$(diff) What Vitest sees (${plural(tests.length, "snippet")})`, "showCollector", uri);
 
-function testLenses(uri: vscode.Uri, test: DiscoveredTest, id: string, outcome: Outcome | undefined) {
+function testLenses(test: DiscoveredTest, id: string, outcome: Outcome | undefined) {
   const range = rangeOf(test);
   const failed = outcome?.state === "failed";
-  if (!test.generatable) return [lens(range, "$(error) Cannot generate: see the error", "showCollector", uri)];
+  if (!test.generatable) {
+    // the problem itself, where the snippet is; the whole of it on a click
+    const [first = "the plugin cannot generate this snippet"] = test.problems;
+    const short = first.length > 90 ? `${first.slice(0, 87)}…` : first;
+    return [lens(range, `$(error) ${short}`, "showProblem", test.problems.join("\n\n") || first)];
+  }
   return [
     lens(range, lensTitle(outcome), failed ? "showFailure" : "runTest", id),
     lens(range, "$(globe) Open page", "openPage", id),
@@ -55,7 +60,7 @@ export const testFileLenses = (tree: TestTree, runner: TestRunner, changed: vsco
         collectorLens(uri, tests),
         ...tests.flatMap((test) => {
           const id = testId(uri, test.name);
-          return testLenses(uri, test, id, runner.outcomeOf(id));
+          return testLenses(test, id, runner.outcomeOf(id));
         }),
       ];
     },

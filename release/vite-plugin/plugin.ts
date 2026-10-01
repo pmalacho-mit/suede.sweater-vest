@@ -59,9 +59,11 @@ export type Options = {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const library = path.resolve(here, "..");
 const runtimes = path.join(library, "runtimes");
-/** What generated components import; under Vitest, resolved to `vitest.ts` beside it. */
+/** What generated components import; under Vitest, resolved to `runtimes/vitest.ts` beside it. */
 export const runtimeFile = path.join(runtimes, "common.svelte.ts");
 const vitestFile = path.join(runtimes, "vitest.ts");
+/** The components a snippet takes as `typeof Sweater.<Component>`. */
+export const componentsFile = path.join(library, "components", "index.ts");
 
 const VITEST_DEFAULT_INCLUDE = ["**/*.{test,spec}.?(c|m)[jt]s?(x)"];
 
@@ -277,6 +279,7 @@ export default function sweaterVest({
       if (!snippet || !isGeneratable(snippet)) return null;
       const { code, map } = generate(analysis, snippet, {
         runtime: runtimeFile,
+        components: componentsFile,
         pockets: values.forSnippet(analysis, snippet),
       });
       return { code, map };

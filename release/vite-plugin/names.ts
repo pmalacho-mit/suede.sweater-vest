@@ -69,7 +69,7 @@ declare namespace importPath {
     typeof importPath,
     [
       [args: ["/p/src/A.svelte", "/p/src/A.s.vest.svelte"], expected: "./A.s.vest.svelte"],
-      [args: ["/p/src/lib/A.svelte", "/p/release/runtime.svelte.ts"], expected: "../../release/runtime.svelte.ts"],
+      [args: ["/p/src/lib/A.svelte", "/p/release/runtimes/common.svelte.ts"], expected: "../../release/runtimes/common.svelte.ts"],
     ]
   >;
 }

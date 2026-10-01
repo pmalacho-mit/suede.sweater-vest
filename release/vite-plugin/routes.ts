@@ -96,11 +96,11 @@ export const importsLibrary = (
 
 declare namespace importsLibrary {
   type Page = `<script lang="ts">
-  import Runner from "../../../../release/page/Runner.svelte";
+  import Runner from "../../../../release/runtimes/Browser.svelte";
 </script>
 <Runner />`;
 
-  type Load = `import { fetchTests } from "$vest/runtime.svelte.ts";
+  type Load = `import { fetchTests } from "$vest/runtimes/common.svelte.ts";
 export const load = () => fetchTests();`;
 
   type Plain = `<script lang="ts">

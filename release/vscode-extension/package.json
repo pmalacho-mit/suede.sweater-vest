@@ -25,6 +25,10 @@
         "title": "Sweater Vest: Show Failure"
       },
       {
+        "command": "sweater-vest.showProblem",
+        "title": "Sweater Vest: Show Problem"
+      },
+      {
         "command": "sweater-vest.extract",
         "title": "Sweater Vest: Extract Test to a File"
       },
@@ -84,6 +88,10 @@
         {
           "command": "sweater-vest.showCollector",
           "when": "editorLangId == svelte"
+        },
+        {
+          "command": "sweater-vest.showProblem",
+          "when": "false"
         }
       ]
     },

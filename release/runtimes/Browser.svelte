@@ -28,7 +28,7 @@
     type Env,
     type Harness,
     type VestEntry,
-  } from "./common.svelte.js";
+  } from "./common.svelte.ts";
 
   let { entry }: { entry: VestEntry } = $props();
 

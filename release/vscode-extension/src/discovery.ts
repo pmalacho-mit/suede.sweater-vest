@@ -12,6 +12,8 @@ export type DiscoveredTest = Range & {
   /** false for a render-only example */
   test: boolean;
   generatable: boolean;
+  /** why it cannot be generated, when it cannot: the plugin's errors at this snippet */
+  problems: string[];
 };
 
 // where the snippet's name is written: `{#snippet name(`
@@ -23,16 +25,25 @@ const nameRange = (text: string, snippet: TestSnippet): Range => {
   return { line: snippet.line - 1, column: snippet.start - lineStart + Math.max(column, 0), length: snippet.name.length };
 };
 
+const lineAt = (text: string, offset: number) => text.slice(0, offset).split("\n").length - 1;
+
 export function discover(fileName: string, text: string): DiscoveredTest[] {
   if (!hasTests(text)) return [];
   const analysis = analyze(fileName, text);
-  return analysis.snippets.map((s) => ({
-    ...nameRange(text, s),
-    name: testName(fileName, s.name),
-    snippet: s.name,
-    test: hasTest(s),
-    generatable: isGeneratable(s),
-  }));
+  return analysis.snippets.map((s) => {
+    const first = s.line - 1;
+    const last = lineAt(text, s.end);
+    return {
+      ...nameRange(text, s),
+      name: testName(fileName, s.name),
+      snippet: s.name,
+      test: hasTest(s),
+      generatable: isGeneratable(s),
+      problems: analysis.warnings
+        .filter((w) => w.severity === "error" && w.line >= first && w.line <= last)
+        .map((w) => w.message),
+    };
+  });
 }
 
 /** The page path for a snippet: the component relative to the folder, without `.svelte`, then the snippet. */

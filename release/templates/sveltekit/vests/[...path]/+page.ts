@@ -1,4 +1,4 @@
-import { fetchTests } from "<path>/sweater-vest-suede/runtime.svelte.ts";
+import { fetchTests } from "<path>/sweater-vest-suede/runtimes/common.svelte.ts";
 import type { PageLoad } from "./$types";
 
 // tests run in the browser only

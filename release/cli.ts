@@ -11,7 +11,7 @@ import {
 } from "./vite-plugin/analyze.ts";
 import { generate } from "./vite-plugin/generate.ts";
 import { scrub } from "./vite-plugin/scrub.ts";
-import { collectorFor, runtimeFile } from "./vite-plugin/plugin.ts";
+import { collectorFor, componentsFile, runtimeFile } from "./vite-plugin/plugin.ts";
 import { generatedId, posix, testName } from "./vite-plugin/names.ts";
 import { SUFFIX, extract, extracted, tempPathFor } from "./extract.ts";
 
@@ -214,6 +214,7 @@ async function printTest(
   );
   return generate(analysis, snippet, {
     runtime: runtimeFile,
+    components: componentsFile,
     pockets,
     ...(at ? { at } : {}),
   }).code;

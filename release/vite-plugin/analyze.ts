@@ -44,6 +44,8 @@ export type Param =
   | { kind: "pocket"; name: string; typeText: string }
   /** `data: typeof fakeData` — an import, handed in as the value it names */
   | { kind: "value"; name: string; local: string; typeText: string }
+  /** `Status: typeof Sweater.Status` — one of the library's components, from the DSL's namespace */
+  | { kind: "sweater"; name: string; member: string; typeText: string }
   | { kind: "unsupported"; name: string; typeText: string };
 
 export type TestSnippet = {
@@ -209,6 +211,17 @@ const queried = (type: Node): string | null => {
   return type.type === "TSTypeQuery" && name?.type === "Identifier" ? (name.name as string) : null;
 };
 
+// `typeof A.B`: the namespace and the member
+const queriedMember = (type: Node): { root: string; member: string } | null => {
+  const name = type.exprName as Node | undefined;
+  if (type.type !== "TSTypeQuery" || name?.type !== "TSQualifiedName") return null;
+  const left = name.left as Node;
+  const right = name.right as Node;
+  return left.type === "Identifier" && right.type === "Identifier"
+    ? { root: left.name as string, member: right.name as string }
+    : null;
+};
+
 const referenced = (type: Node): string | null => {
   const name = type.typeName as Node | undefined;
   return type.type === "TSTypeReference" && name?.type === "Identifier" && !type.typeArguments
@@ -221,6 +234,7 @@ function classify(
   source: string,
   self: string,
   tests: Set<string>,
+  sweaters: Set<string>,
   locals: Set<string>,
 ): Param {
   const name = param.type === "Identifier" ? (param.name as string) : source.slice(param.start, param.end);
@@ -230,6 +244,8 @@ function classify(
   const query = queried(type);
   if (query === self) return { kind: "subject", name };
   if (query && locals.has(query)) return { kind: "value", name, local: query, typeText };
+  const member = queriedMember(type);
+  if (member && sweaters.has(member.root)) return { kind: "sweater", name, member: member.member, typeText };
   const reference = referenced(type);
   if (reference && tests.has(reference)) return { kind: "test", name };
   if (type.type === "TSTypeLiteral") return { kind: "pocket", name, typeText };
@@ -328,6 +344,7 @@ export function analyze(file: string, source: string): Analysis {
 
   if (self) {
     const tests = dslLocals(imports, "Test");
+    const sweaters = dslLocals(imports, "Sweater");
     const locals = importLocals(imports);
     const declared = new Set([...declaredIn(ast.module?.content), ...declaredIn(ast.instance?.content)]);
     const nodes = ast.fragment.nodes as unknown as Node[];
@@ -349,13 +366,13 @@ export function analyze(file: string, source: string): Analysis {
       if (!first || queried(typeOf(first) ?? { type: "" }) !== self) continue;
       if (usedOutside(node, name)) continue;
 
-      const classified = params.map((p) => classify(p, source, self, tests, locals));
+      const classified = params.map((p) => classify(p, source, self, tests, sweaters, locals));
       for (const [i, p] of classified.entries()) {
         if (p.kind !== "unsupported") continue;
         warn(
           params[i]!,
           `\`${p.name}: ${p.typeText}\` is not something a test snippet can be handed: ` +
-            "write a bare object type for a pocket, `typeof` an import for a value, or `Test`",
+            "write a bare object type for a pocket, `typeof` an import for a value, `typeof Sweater.<Component>`, or `Test`",
         );
       }
       const unreachable = unreachableIn(node, declared);
@@ -459,6 +476,21 @@ import { helper } from "./helper.ts";
     Invoke<typeof paramsOf, [Value, "withValues", ValueScript]>,
     "=",
     ["subject", "value:fakeData", "value:helper", "test"]
+  >;
+
+  type Helped = `
+{#snippet helped(C: typeof Self, Status: typeof Sweater.Status, Frame: typeof Sweater.Frame, test: Test)}
+  <Frame><C /></Frame>
+  <Status {test} />
+  {test(async () => {})}
+{/snippet}
+`;
+
+  /** `typeof Sweater.X` — the DSL's components namespace — hands in that component */
+  export type Helpers = Expect<
+    Invoke<typeof paramsOf, [Helped, "helped"]>,
+    "=",
+    ["subject", "sweater:Status", "sweater:Frame", "test"]
   >;
 
   type Odd = `

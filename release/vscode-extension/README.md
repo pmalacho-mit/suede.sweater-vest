@@ -32,7 +32,12 @@ path. It parses with your project's own Svelte compiler and runs the library's
 - **Failures** — clicking a failed lens opens the output with Vitest's message
   and the frames from your own code.
 - **Errors** — a parameter the plugin cannot hand in, or a snippet reaching a
-  variable of the component's script, reported where you wrote it.
+  variable of the component's script, reported where you wrote it; the lens
+  above such a snippet says what is wrong, and a click shows the whole of it.
+
+The extension bundles the library's analyser at build time. After updating the
+library, run `npm run install-extension` again, or its lenses may disagree
+with what the plugin does.
 
 ## About extracted files
 

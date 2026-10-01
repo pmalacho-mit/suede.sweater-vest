@@ -32,7 +32,7 @@ export const prelude = (script = "") =>
   [
     `<script lang="ts">`,
     `  import type Self from "./Probe.svelte";`,
-    `  import type { Test, Widen } from "../lib/dsl.import.meta.vitest";`,
+    `  import type { Test, Widen, Sweater } from "../lib/dsl.import.meta.vitest";`,
     ...(script.trim() ? [script.trim().replace(/^/gm, "  ")] : []),
     `</script>`,
     ``,
@@ -68,7 +68,7 @@ const snippetOf = (analysis: Analysis, name: string) => {
 
 export const paramsOf = (markup: string, snippet: string, script = "") =>
   snippetOf(analyzed(markup, script), snippet).params.map((p) =>
-    p.kind === "value" ? `${p.kind}:${p.local}` : p.kind,
+    p.kind === "value" ? `${p.kind}:${p.local}` : p.kind === "sweater" ? `${p.kind}:${p.member}` : p.kind,
   );
 
 export const lineOf = (markup: string, snippet: string): number =>
@@ -83,7 +83,8 @@ export const generated = (
 ): string => {
   const analysis = analyzed(markup, script);
   return generate(analysis, snippetOf(analysis, snippet), {
-    runtime: "/project/lib/runtime.svelte.ts",
+    runtime: "/project/lib/runtimes/common.svelte.ts",
+    components: "/project/lib/components/index.ts",
     pockets: new Map(
       Object.entries(pockets).map(([name, initial]) => [
         name,
@@ -97,7 +98,8 @@ export const generated = (
 export const generatedWhole = (source: string, snippet: string): string => {
   const analysis = analyzedWhole(source);
   return generate(analysis, snippetOf(analysis, snippet), {
-    runtime: "/project/lib/runtime.svelte.ts",
+    runtime: "/project/lib/runtimes/common.svelte.ts",
+    components: "/project/lib/components/index.ts",
     pockets: new Map(),
   }).code;
 };

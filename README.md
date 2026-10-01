@@ -7,6 +7,9 @@ it is developed.
   each with its test snippets — Testing Library's canonical cases, forms,
   bindable props, context, transitions, dialogs, keyboard navigation, instance
   methods, shared runes state. The library's README lists them.
+- [src/lib/showcase](./src/lib/showcase): the library's own components for
+  tests (`Sweater.Status`, `Frame`, `Stage`, `Row`, `Column`, `Grid`,
+  `Labeled`, `Theme`, `Inspect`), each shown in a snippet.
 - [src/routes/vests](./src/routes/vests): every snippet on a page of its own
   (`/vests`), running its test live.
 - [src/routes/examples](./src/routes/examples): the example components used as

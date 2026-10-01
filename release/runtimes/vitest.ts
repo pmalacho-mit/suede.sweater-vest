@@ -1,4 +1,4 @@
-// The runtime as Vitest gets it: the plugin resolves `runtime.svelte.ts` here
+// The runtime as Vitest gets it: the plugin resolves `common.svelte.ts` here
 // under Vitest, so a generated component's `define` registers a test.
 import { expect, onTestFinished, test, vi } from "vitest";
 import {

@@ -9,6 +9,8 @@ export type PocketValue = { initial: string; imports: Map<string, Set<string>> }
 export type GenerateOptions = {
   /** Absolute path of the runtime module the generated file imports from. */
   runtime: string;
+  /** Absolute path of the components index, for `typeof Sweater.<Component>` parameters. */
+  components: string;
   /** Printed initial values, by pocket parameter name. */
   pockets: Map<string, PocketValue>;
   /** The file the component is served or written as: its in-memory id unless extracted. */
@@ -63,6 +65,7 @@ export function generate(analysis: Analysis, snippet: TestSnippet, options: Gene
   const values = new Set<string>();
   const args: string[] = [];
   const extraImports = new Map<string, Set<string>>();
+  let sweater = false;
   for (const p of snippet.params) {
     if (p.kind === "subject") {
       values.add(analysis.self!);
@@ -75,6 +78,9 @@ export function generate(analysis: Analysis, snippet: TestSnippet, options: Gene
       args.push(`__pocket<${p.typeText}>(${value?.initial ?? "{}"})`);
       for (const [specifier, bindings] of value?.imports ?? [])
         extraImports.set(specifier, new Set([...(extraImports.get(specifier) ?? []), ...bindings]));
+    } else if (p.kind === "sweater") {
+      sweater = true;
+      args.push(`__Sweater.${p.member}`);
     } else if (p.kind === "test") args.push("__harness.test");
     else args.push("undefined");
   }
@@ -106,6 +112,7 @@ export function generate(analysis: Analysis, snippet: TestSnippet, options: Gene
     ``,
     `<script${langAttr}>`,
     `  import { pocket as __pocket, type Harness as __Harness } from ${quote(runtime)};`,
+    ...(sweater ? [`  import * as __Sweater from ${quote(importPath(id, options.components))};`] : []),
     indent(imports.join("\n")),
     ``,
     `  let { harness: __harness }: { harness: __Harness } = $props();`,
@@ -142,7 +149,7 @@ declare namespace generate {
   export type SelfAsValue = Expect<Code, "includes", 'import Self from "./Probe.svelte";'>;
 
   /** the DSL stays a type import */
-  export type DslStaysType = Expect<Code, "includes", 'import type { Test, Widen } from "../lib/dsl.import.meta.vitest";'>;
+  export type DslStaysType = Expect<Code, "includes", 'import type { Test, Widen, Sweater } from "../lib/dsl.import.meta.vitest";'>;
 
   /** the snippet is copied as written */
   export type Verbatim = Expect<Code, "includes", "<C bind:this={pocket.el} />">;
@@ -185,6 +192,22 @@ import type * as ns from "./ns.ts";
 }
 
 declare namespace generate {
+  type WithStatus = `
+{#snippet shown(C: typeof Self, Status: typeof Sweater.Status, test: Test)}
+  <Status {test} />
+  <C />
+  {test(async () => {})}
+{/snippet}
+`;
+
+  type StatusCode = Invoke<typeof generated, [WithStatus, "shown"]>;
+
+  /** a library component comes from the components index, under the namespace the snippet wrote */
+  export type Components = [
+    Expect<StatusCode, "includes", 'import * as __Sweater from "../lib/components/index.ts";'>,
+    Expect<StatusCode, "includes", "{@render shown(Self, __Sweater.Status, __harness.test)}">,
+  ];
+
   type Styled = `<script lang="ts">
   import type Self from "./Probe.svelte";
   import type { Test } from "../lib/dsl.import.meta.vitest";

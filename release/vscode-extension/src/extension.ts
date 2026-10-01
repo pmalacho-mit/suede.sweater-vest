@@ -29,6 +29,11 @@ function testCommands({ output, tree, runner }: Parts) {
       const item = tree.itemFrom(id);
       if (item) await runner.run(item.uri, item);
     }),
+    command("showProblem", (text: string) => {
+      output.clear();
+      output.appendLine(text);
+      output.show(true);
+    }),
     command("showFailure", (id: string) => {
       const outcome = runner.outcomeOf(id);
       if (outcome?.state !== "failed") return;

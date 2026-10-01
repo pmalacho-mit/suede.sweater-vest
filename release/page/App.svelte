@@ -3,8 +3,8 @@
   // hash names it (`#src/lib/Button/clicks`). SvelteKit projects use the route
   // template instead, which renders `Runner` directly.
   import { onMount } from "svelte";
-  import Runner from "./Runner.svelte";
-  import { fetchTests, type VestEntry } from "../runtime.svelte.ts";
+  import Runner from "../runtimes/Browser.svelte";
+  import { fetchTests, type VestEntry } from "../runtimes/common.svelte.ts";
 
   let tests = $state<VestEntry[]>([]);
   onMount(async () => (tests = await fetchTests()));

@@ -1,6 +1,6 @@
 // What a generated test component and a page share: the harness a snippet's
 // `test` comes from, pockets, captures, and what a page publishes about its run.
-// Under Vitest the plugin resolves this module to `vitest.ts`, which re-exports
+// Under Vitest the plugin resolves this module to `./vitest.ts`, which re-exports
 // it with a `define` that registers a Vitest test; here, a page mounts the
 // component itself, so `define` has nothing to do.
 import { flushSync, tick, type Component } from "svelte";
@@ -59,6 +59,8 @@ export type Test = ((body: Body) => void) & {
   readonly state: TestState;
   /** The failure's message, once it has failed. */
   readonly error: string | null;
+  /** Every `note` the body wrote so far. */
+  readonly notes: readonly string[];
 };
 
 /**
@@ -120,7 +122,7 @@ export function createHarness(
   let error = $state<string | null>(null);
   let body: Body | null = null;
   let calls = 0;
-  const notes: string[] = [];
+  const notes = $state<string[]>([]);
   const captures: Captured[] = [];
   const { onNote, capture, ...rest } = env;
 
@@ -149,6 +151,7 @@ export function createHarness(
       name: { value: name },
       state: { get: () => state },
       error: { get: () => error },
+      notes: { get: () => notes },
     },
   ) as unknown as Test;
 
