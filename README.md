@@ -3,378 +3,466 @@
 > [!NOTE]
 > This is a [suede](https://github.com/pmalacho-mit/suede) dependency.
 
-A Svelte 5 component testing library that renders tests alongside the components they test (leveraging your existing dev server).
-
-Tests are written as `.test.svelte` files. Each file contains one or more `<Sweater>` components. A `<Sweater>` pairs a **vest snippet** (the rendered component under test) with a **body function** (the async test logic). Tests run live in the browser and display their results in a dockview grid panel.
-
-The same setup that powers interactive development also powers automated report generation: point the report script at your running dev server, and it drives a containerized browser through every test file and produces a Markdown report (see [reporting](#4-automated-reporting)).
-
----
-
-## Table of Contents
-
-1. [Writing tests](#1-writing-tests)
-2. [Vite setup](#2-vite-setup)
-3. [SvelteKit setup](#3-sveltekit-setup)
-4. [Automated reporting](#4-automated-reporting)
-5. [Making reports informative](#5-making-reports-informative)
-
----
-
-## 1. Writing tests
-
-Place test files alongside the components they test (e.g. `Button.test.svelte` next to `Button.svelte`).
-
-### Basic structure
+Svelte component tests written as snippets, beside the component they test,
+run by Vitest — and erased from every build, because a Vite plugin takes them
+out before the compiler sees them.
 
 ```svelte
-<!-- src/lib/Button.test.svelte -->
+<!-- src/lib/Counter.svelte -->
 <script lang="ts">
-  import { Sweater } from "<path>/sweater-vest-suede";
-  import Button from "./Button.svelte";
+  import type Self from "./Counter.svelte";
+  import type { Test, Widen } from "<path>/sweater-vest-suede/dsl.import.meta.vitest";
 
-  class Pocket {
-    button = $state<HTMLButtonElement>();
-    clicked = $state(false);
+  let { count = 0 }: { count?: number } = $props();
+</script>
+
+<p>{count}</p>
+
+<<!-- BEGIN SWEATER VEST TEST -->
+{#snippet counts(
+  Counter: typeof Self,
+  pocket: { count: Widen<2>; el: HTMLDivElement },
+  test: Test,
+)}
+  <p>{test.name}: {test.state}</p>
+  <div bind:this={pocket.el}>
+    <Counter count={pocket.count} />
+  </div>
+  {test(async ({ expect, flushSync }) => {
+    expect(pocket.el.textContent).toContain("2");
+    pocket.count = 3;
+    flushSync();
+    expect(pocket.el.textContent).toContain("3");
+  })}
+{/snippet}
+
+```
+
+The snippet is never rendered by the component, so the type checker reads it as
+you write it — a prop of the wrong type is an error — and the plugin prints it as
+a test component of its own, which Vitest runs under jsdom and your dev server
+renders on a page of its own.
+
+## Setup
+
+Add the plugin to your Vite config, and its project to Vitest's:
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vitest/config";
+import { sveltekit } from "@sveltejs/kit/vite";
+import sweaterVest from "<path>/sweater-vest-suede/vite-plugin/plugin.ts";
+
+export default defineConfig({
+  plugins: [sveltekit(), sweaterVest()],
+  test: {
+    projects: [
+      sweaterVest.project(),
+      // your other projects, as they were
+    ],
+  },
+});
+```
+
+`sweaterVest.project()` is the project snippet tests run in, typed as exactly
+what it returns:
+
+```ts
+{ extends: true; resolve: { conditions: ["browser"] }; test: { name: "sweater-vest"; environment: "jsdom"; include: [] } }
+```
+
+Every part is needed: `extends: true` inherits your config and the plugin with
+it, the `browser` condition gives Svelte its client build, and `include: []`
+because the plugin collects components itself. What may vary is an option:
+
+```ts
+sweaterVest.project({
+  name: "dom",                          // then also sweaterVest({ project: "dom" })
+  environment: "happy-dom",             // default "jsdom"
+  test: { setupFiles: ["./setup.ts"] }, // anything else for this project's `test`
+});
+```
+
+Without `projects` at all, the plugin collects in your one config; give it
+`environment: "jsdom"` and `resolve: { conditions: ["browser"] }` yourself.
+
+Installing with suede adds the packages the library needs to your
+`package.json` (see [package.json](./package.json)): among them
+`@typescript/typescript6`, the TypeScript the printer reads pocket types with,
+installed under its own name so it never displaces yours, and `playwright`,
+which the report drives. `jsdom` and `vitest` are yours to provide. Node 24
+runs the library's TypeScript directly, so nothing is compiled first.
+
+The options, all optional:
+
+| Option      | What it does                                                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `project`   | The Vitest project name(s) that collect components. Every project without it.                                                |
+| `exclude`   | Globs discovery skips, relative to the project root. `node_modules` and dot-directories are always skipped.                  |
+| `extracted` | The glob for extracted tests, added to Vitest's `include`; `false` leaves them out. Default `**/*.vest.temp.svelte`.         |
+| `tsconfig`  | The tsconfig file name, found upward from the working directory. Default `tsconfig.json`.                                    |
+| `scan`      | Discover components with tests by scanning the working directory. Default `true`.                                            |
+| `external`  | Where a browser outside this machine reaches the dev server (a container's published port), for the editor to open pages at. |
+| `routes`    | SvelteKit's routes directory. Default `src/routes`.                                                                          |
+
+For pages on your dev server, copy a route from [templates](./templates/README.md).
+
+## Importing the DSL (_the path matters_)
+
+Import the DSL from [dsl.import.meta.vitest.ts](./dsl.import.meta.vitest.ts) in
+**every** component you write tests in, always as a type:
+
+```svelte
+<script lang="ts">
+  import type Self from "./Counter.svelte";
+  import type { Test } from "<path>/sweater-vest-suede/dsl.import.meta.vitest";
+</script>
+```
+
+The module is named so that importing it puts the string `import.meta.vitest`
+in your component. Vitest decides which files hold tests by keeping the ones
+whose text contains that string (its
+[in-source testing](https://vitest.dev/guide/in-source.html)), so importing the
+DSL is what makes your tests findable. Re-exporting it from a barrel of your own
+hides them; `import type` it directly.
+
+## What counts as a test snippet
+
+A snippet is the library's when it is **never rendered** and its **first
+parameter is `typeof Self`**, where `Self` is the component's own type,
+imported as a type from the file itself. An unused reference to its own source
+is what marks in-source testing; nothing is read into a snippet's name or
+position.
+
+- With a parameter typed `Test`, it is a test: one Vitest test, named `Counter > counts`.
+- Without one, it is an **example**: a page on the dev server, and a Vitest
+  test that it mounts without throwing — so documentation stays valid.
+
+Every parameter is handed in by what its type says:
+
+| Parameter     | Written as                                 | Handed                                                      |
+| ------------- | ------------------------------------------ | ----------------------------------------------------------- |
+| the component | `Counter: typeof Self`                     | the component, as a value — always first                    |
+| a pocket      | `pocket: { count: 2; el: HTMLDivElement }` | a reactive object, see below                                |
+| a value       | `data: typeof fakeData`                    | the import `fakeData`, imported as a value if it was a type |
+| the test      | `test: Test`                               | the function the body is handed to                          |
+
+Anything else is an error where it is written, and the run stops.
+
+### Components for tests
+
+The DSL also exports `Sweater`, a namespace of components for writing and
+showing tests. A snippet takes one as `typeof Sweater.<Name>`, and the
+generated test imports the real component; the namespace itself is types, so
+nothing of it reaches a build:
+
+```svelte
+<script lang="ts">
+  import type Self from "./Counter.svelte";
+  import type { Test, Sweater } from "<path>/sweater-vest-suede/dsl.import.meta.vitest";
+</script>
+
+{#snippet shown(Counter: typeof Self, Status: typeof Sweater.Status, Frame: typeof Sweater.Frame, test: Test)}
+  <Status {test} />
+  <Frame><Counter /></Frame>
+  {test(async ({ expect }) => { … })}
+{/snippet}
+```
+
+| Component       | What it is for                                                                        |
+| --------------- | ------------------------------------------------------------------------------------- |
+| `Status`        | the test's name, state, notes and failure: `<Status {test} />`                        |
+| `Inspect`       | a live JSON view of a value, a pocket say: `<Inspect value={pocket} />`               |
+| `Labeled`       | a caption over a variant: `<Labeled label="tone=good">…</Labeled>`                    |
+| `Frame`         | a box sized to its content, with `bind:element` for a `capture` of just the component |
+| `Stage`         | a viewport of a known size, `scroll` and `checkered` optional                         |
+| `Row`, `Column` | variants side by side, or stacked, with `gap` and `align`                             |
+| `Grid`          | a matrix of variants: `<Grid columns={3}>`                                            |
+| `Theme`         | content under `scheme="light"` or `"dark"` (`color-scheme` and `data-theme`)          |
+
+They live in [components/](./components), and `src/lib/showcase` in the
+repository shows each one in a snippet.
+
+### Pockets
+
+A bare object type is a pocket: a `$state` object the snippet and the body
+share. Members written as literal types are its initial value — `count: 2`
+starts at `2` — and the rest start undefined, which is what an element or a
+component instance is until the snippet binds it in:
+
+```svelte
+{#snippet counts(Counter: typeof Self, pocket: { count: Widen<2>; el: HTMLDivElement; counter: Self }, test: Test)}
+  <div bind:this={pocket.el}>
+    <Counter bind:this={pocket.counter} count={pocket.count} />
+  </div>
+```
+
+`count: 2` is the type `2`, so the body could never assign `3` to it:
+`Widen<2>` is `number` to the checker and `2` to the pocket. `typeof` an import
+works as a member too (`data: typeof seed` starts as `seed`), and so do nested
+objects, tuples and template literals.
+
+Non-reactive values the markup shares are an `{@const}` inside the snippet.
+
+### The test
+
+Call `test` exactly once, in the snippet's markup, with the body. The body runs
+once the markup is mounted (every `bind:this` is set) and is handed:
+
+| Member                                     | What it is                                                                                                                     |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `expect`                                   | Vitest's                                                                                                                       |
+| `user`                                     | a `@testing-library/user-event` session                                                                                        |
+| `screen`, `within`, `fireEvent`, `waitFor` | Testing Library's                                                                                                              |
+| `flushSync`, `tick`                        | Svelte's                                                                                                                       |
+| `note(text)`                               | an annotation, kept with the outcome (a Vitest annotation too)                                                                 |
+| `capture(el?, name?)`                      | a PNG of `el` (the page by default), kept with the outcome; a real screenshot, so only under the report — `null` anywhere else |
+| `context`, `vi`                            | Vitest's, when running under Vitest                                                                                            |
+
+A snippet that never calls `test`, or calls it twice, fails saying so.
+
+`test` also carries the test's name and, reactively, where it stands, so the
+snippet decides what a page shows and how — the library adds no markup of its
+own around a snippet:
+
+```svelte
+<p>{test.name}: {test.state}{#if test.error}, {test.error}{/if}</p>
+```
+
+| Member       | What it is                                     |
+| ------------ | ---------------------------------------------- |
+| `test.name`  | `Counter > counts`                             |
+| `test.state` | `"running"`, then `"passed"` or `"failed"`     |
+| `test.error` | the failure's message, once it has failed      |
+| `test.notes` | every `note` the body wrote so far, reactively |
+
+## What works, and where the seams are
+
+The library is exercised against the patterns component tests are actually
+written with — Testing Library's own examples, the Svelte docs' testing page,
+and the shapes real component libraries take — each as an example component
+with snippet tests in the repository's `src/lib/examples`:
+
+| Pattern                                                                     | Example       |
+| --------------------------------------------------------------------------- | ------------- |
+| a prop, a click, what appears                                               | `Greeter`     |
+| a bindable prop, written back through the binding; keyboard activation      | `Counter`     |
+| `bind:value` into a pocket; a callback prop                                 | `TextInput`   |
+| a form: typing, selecting, checking, submitting, validation messages        | `Form`        |
+| children and a snippet prop, declared inside the test snippet               | `Card`        |
+| a keyed list driven by a pocket array                                       | `List`        |
+| `{#await}` with an injected loader settled by the test; `waitFor`, `findBy` | `Async`       |
+| an effect with a timer, waited for in real time                             | `Clock`       |
+| context, through a provider component imported as a type                    | `Themed`      |
+| a transition in and out                                                     | `Fade`        |
+| a dialog: focus on open, `svelte:window` Escape to close                    | `Modal`       |
+| ARIA roles and arrow-key navigation                                         | `Tabs`        |
+| a component's exported functions, through the instance in the pocket        | `Stopwatch`   |
+| shared runes state from a `.svelte.ts` module                               | `CartSummary` |
+| a component's own `<style>`, kept under the snippet                         | `Card`        |
+| examples only, no body: a page, and a test that they mount                  | `Badge`       |
+
+Every one runs under Vitest and on its page, and a production build of an app
+that uses all of those components (`src/routes/examples`) holds none of their
+tests: no pocket, no harness module, no DSL, no type-only import.
+
+The seams, so they are not surprises:
+
+- **A snippet reaches its parameters, its own `{@const}`s, and imports.** Not
+  the component's script: `let count = $state(0)` in the script is the
+  component's, not a generated test's. Reading one is an error, reported where
+  the snippet is, and it stops the run (Vitest, the dev server and a build
+  alike) rather than skip the test quietly. Put shared values in a module and
+  `import type` it. A parameter the plugin cannot hand in is an error the same way.
+- **A snippet is a declaration.** Its name cannot be a script variable's.
+- **jsdom has no Web Animations API.** Under Vitest the runtime makes every
+  animation finish on the next tick, so a transition's element leaves when it
+  should. Observers (`IntersectionObserver`, `ResizeObserver`) and `matchMedia`
+  are not provided; a component that needs them wants a page, or a stub in a
+  harness module.
+- **`vi` is Vitest's.** On a page `payload.vi` is undefined. Fake timers are
+  rarely what you want here anyway: the markup is mounted before the body
+  runs, so a timer the component started already runs on real time; wait for
+  it. Mocking a module needs `vi.mock` at the top of a module, which a snippet
+  is not; prefer injecting what the component depends on (`Async`).
+- **A style only a snippet uses leaves the build, with a word.** The snippet's
+  markup is written under the component's `<style>`, and the generated test
+  keeps the whole block, so a class the snippet adds for itself works there.
+  In a build the snippet is gone, so to Svelte that selector is unused: it is
+  dropped from the CSS and named in the build log as an unused selector. The
+  library does not trim CSS; that warning is the signal that a selector is
+  test-only, and the way to quiet it is to move such styles into the snippet's
+  own markup or a harness component.
+- **The pages route is left out of builds.** A route that imports the library
+  is renamed out of SvelteKit's sight for the length of a build and restored
+  after. Nothing of the page runner or its dependencies reaches a build.
+
+## How a test is run
+
+Nothing is written to disk. For a component with tests, the plugin removes the
+test snippets and appends a collector to its module script:
+
+```svelte
+<script lang="ts" module>
+  if (import.meta.vitest) {
+    await import("./Counter.counts.vest.svelte");
   }
 </script>
-
-<Sweater
-  name="calls onClick when clicked"
-  body={async (harness) => {
-    const pocket = harness.set(new Pocket());
-    const { button } = await harness.definition("button");
-
-    await harness.withUserFocus(async (userEvent) => {
-      await userEvent.click(button);
-    });
-
-    harness.expect(pocket.clicked).toBe(true);
-  }}
->
-  {#snippet vest(p: Pocket)}
-    <Button bind:el={p.button} onclick={() => (p.clicked = true)} />
-  {/snippet}
-</Sweater>
 ```
 
-The **pocket** is a plain class instance that holds reactive state shared between the vest and the body. Because fields are declared with `$state`, the body can observe DOM updates reactively via `harness.definition()`.
+and serves each of those ids from memory: a component that imports yours as a
+value, holds the snippet as written, and renders it with the component, a pocket
+and the harness's `test`. Its module script registers it as one Vitest test.
+Failures point at the line of the component you wrote.
 
-### `<Sweater>` props
+In a build, the snippets are removed and nothing is appended.
 
-| Prop       | Type                                                  | Description                                                           |
-| ---------- | ----------------------------------------------------- | --------------------------------------------------------------------- |
-| `body`     | `(harness: TestHarness<T>) => Promise<void>`          | The test logic. Required.                                             |
-| `vest`     | `Snippet<[pocket: T]>`                                | The rendered component under test. Required.                          |
-| `name`     | `string`                                              | Display name shown in the panel tab and report. Strongly recommended. |
-| `id`       | `string`                                              | Stable identifier for targeting a specific test when filtering.       |
-| `mode`     | `"parallel" \| "serial"`                              | Scheduling relative to siblings. Default: `"parallel"`.               |
-| `lazy`     | `boolean`                                             | Defer rendering until `harness.set()` is called.                      |
-| `manual`   | `boolean`                                             | Wait for an external trigger before running.                          |
-| `position` | `"above" \| "below" \| "left" \| "right" \| "within"` | Position relative to the previous panel in the grid.                  |
+## Pages
 
-### `TestHarness` API
+With a route from [templates](./templates/README.md), the dev server lists
+every snippet at `/vests` and renders one at `/vests/<component>/<snippet>`
+(`src/lib/Counter.svelte` > `counts` is `src/lib/Counter/counts`). A test runs
+there too, live in the browser; the page shows exactly what the snippet wrote,
+and `test.state` is how it says whether it passed. The page asks the dev
+server for the list (`/__sweater-vest/tests.json`, which only the dev server
+answers) and imports each generated component from it.
 
-| Member                | Description                                                                                                                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set(pocket)`         | Initialise or replace the pocket; triggers render if `lazy`.                                                                                                                                   |
-| `definition(...keys)` | Wait for named pocket fields to become non-null (requires `$state` runes).                                                                                                                     |
-| `expect`              | All `@storybook/test` matchers (`expect(x).toBe(...)`, `expect(x).toMatchObject(...)`, etc.).                                                                                                  |
-| `withUserFocus(fn)`   | Serialise user interactions through a shared queue to prevent synthetic-event races.                                                                                                           |
-| `capture(type)`       | Screenshot the vest container. `"png"` / `"jpeg"` / `"svg"` return `{ uri: Promise<string>, download(filename) }`; `"blob"` / `"canvas"` / `"pixelData"` return the raw html-to-image promise. |
-| `note(text)`          | Add a text annotation to the report card. No-op during interactive development.                                                                                                                |
-| `delay(amount)`       | Sleep for `{ seconds }`, `{ milliseconds }`, `{ minutes }`, or `{ frames }`.                                                                                                                   |
-| `container`           | The raw `HTMLElement` wrapping the vest snippet.                                                                                                                                               |
-| `preventRender()`     | Block render until the returned function is called. Must be called before any `await`.                                                                                                         |
-| `onAbort(fn)`         | Register a teardown callback for when the test is aborted.                                                                                                                                     |
+The route is the dev server's alone. In a build, a route whose `+page` or
+`+layout` files import from the library is left out: for the length of the
+build its `+` files are renamed so SvelteKit does not see them, and they are
+put back when the build ends, however it ends. So a static adapter, which
+refuses a dynamic route, builds clean, and no adapter ships a page that could
+show nothing. One thing to keep in mind: a link to that route elsewhere in your
+app is a link to nothing in a build, which a static adapter's crawler reports.
 
-### Grouping tests
+## The report
 
-Wrap `<Sweater>` instances in `<Sweater config>` to group them in a shared panel column and control their layout:
-
-```svelte
-<!-- Two tests stacked vertically in the same column -->
-<Sweater config orientation="vertical" category="Button">
-  <Sweater name="default state" body={...}>{#snippet vest(p)}{/snippet}</Sweater>
-  <Sweater name="hover state"   body={...}>{#snippet vest(p)}{/snippet}</Sweater>
-</Sweater>
-```
-
-A config group can also be written as a self-closing `<Sweater config />` with no children, in which case it applies to every following `<Sweater>` until the next config group.
-
-#### `<Sweater config>` props
-
-| Prop          | Type                         | Description                                                                  |
-| ------------- | ---------------------------- | ---------------------------------------------------------------------------- |
-| `config`      | `true`                       | Marks this `<Sweater>` as a group rather than a test. Required.              |
-| `orientation` | `"horizontal" \| "vertical"` | Direction new panels are added in. Default: `"horizontal"`.                  |
-| `category`    | `string`                     | Labels the group in the report, and is a filter target for `--test`.         |
-| `mode`        | `"parallel" \| "serial"`     | Default scheduling for tests in the group. Individual tests may override it. |
-| `class`       | `string`                     | Class applied to the group's container element.                              |
-| `style`       | `string`                     | Inline style applied to the group's container element.                       |
-
----
-
-## 2. Vite setup
-
-### 1. Copy the template entry point
-
-Copy `templates/vite/template.ts` to your `src/` directory (rename it — e.g. `src/tests.ts`). Update the `<path>` placeholder to point at `sweater-vest-suede` and the glob pattern to match where your test files live:
-
-```ts
-// src/tests.ts
-import { mount } from "svelte";
-import Closet from "<path>/sweater-vest-suede/Closet.svelte";
-
-const app = mount(Closet, {
-  target: document.getElementById("app")!,
-  props: {
-    glob: import.meta.glob("/src/**/*.test.svelte"),
-  },
-});
-
-export default app;
-```
-
-> **Note:** The glob pattern must start with `/`. Patterns without a leading slash are relative to the file and will not pick up tests in other directories.
-
-### 2. Copy the HTML entry point
-
-Copy `templates/vite/template.html` to your project root (rename it — e.g. `tests.html`). Update the `file` attribute to point to the entry point from step 1 (e.g. `src/tests.ts`).
-
-### 3. Add the report script to `package.json`
-
-```jsonc
-{
-  "scripts": {
-    "dev": "vite",
-    "report": "<path>/sweater-vest-suede/report.sh",
-  },
-}
-```
-
-`report.sh` requires [`tsx`](https://tsx.is) to be available. Install it if needed:
+With the dev server running, the report opens every test snippet's page in a
+real browser, waits for each to settle, and writes a Markdown report with every
+failure's message, and the notes and captures each test made:
 
 ```sh
-npm install --save-dev tsx
+npm run dev          # terminal 1
+npm run report       # terminal 2 → fashion-show.md, captures beside it in fashion-show.assets/
 ```
 
-### 4. Browse tests interactively
+It exits non-zero when a test failed. Browsers come from `playwright`
+(`npx playwright install chromium` once); Docker is not involved.
 
-```sh
-npm run dev
-# Navigate to http://localhost:<port>/tests
+| Flag                  | Short | What it does                                      | Default                 |
+| --------------------- | ----- | ------------------------------------------------- | ----------------------- |
+| `--server <url>`      | `-s`  | where the dev server is                           | `http://localhost:5173` |
+| `--route <path>`      | `-r`  | the route that renders a snippet on a page        | `/vests`                |
+| `--browser <name>`    | `-b`  | `chromium`, `firefox` or `webkit`; repeatable     | `chromium`              |
+| `--output <path>`     | `-o`  | the Markdown report; `""` writes nothing          | `./fashion-show.md`     |
+| `--test <pattern>`    | `-t`  | only tests whose name matches, case-insensitively | all                     |
+| `--timeout <seconds>` | `-w`  | how long one page may take to settle              | `60`                    |
+| `--headed`            |       | show the browser                                  | off                     |
+
+The same from code: `generateReport(options)` in [report/index.ts](./report/index.ts)
+returns the runs and the counts.
+
+## Extracting a test
+
+A test can be written out as a real file beside its component:
+
+```
+src/lib/Counter.svelte  >  counts
+src/lib/Counter.counts.vest.temp.svelte
 ```
 
-`Closet.svelte` renders a tree of all discovered test files. Click any entry to load and run its tests.
+It is the same module the plugin serves from memory as `Counter.counts.vest.svelte`
+— the one both Vitest and the page load — made real, so everything that works
+on a test file works on it: run it, put a breakpoint in it, edit it, delete it.
+Only two things differ: the self-import names the real file, and the header.
+The plugin adds `**/*.vest.temp.svelte` to Vitest's `include`; add `*.vest.temp.svelte`
+to your `.gitignore`.
 
----
+```
+node <path>/cli.ts src/lib/Counter.svelte counts            # print it
+node <path>/cli.ts src/lib/Counter.svelte counts --extract  # write it beside the component
+node <path>/cli.ts src/lib/Counter.svelte --list            # the component's snippets, as JSON
+node <path>/cli.ts src/lib/Counter.svelte --collector       # the component as Vitest sees it
+node <path>/cli.ts --clean-extracted [dir]                  # delete extracted tests (edited ones kept, unless --force)
+```
 
-## 3. SvelteKit setup
+The [editor extension](./vscode-extension/README.md) extracts on a click and
+puts Run, Debug and Delete at the top of the file it wrote.
 
-### 1. Create a tests route
+## Snippets as documentation
 
-Create a `tests/` directory inside `src/routes/` and copy `templates/sveltekit/+page.svelte` into it. Update the `<path>` placeholder:
+A snippet is already how a reader would use the component, with a test
+attached. The command line prints it that way, for a README:
+
+```
+node <path>/cli.ts src/lib/Counter.svelte --markdown                 # every snippet of the component
+node <path>/cli.ts src/lib/Counter.svelte counts --markdown          # one snippet
+node <path>/cli.ts src/lib --markdown --header-level 3 > docs.md     # every component under a directory
+```
+
+Each snippet becomes a heading, the usage as a Svelte component, and — for a
+test — "Verified by" with the body of its test:
+
+````markdown
+### counts
 
 ```svelte
-<!-- src/routes/tests/+page.svelte -->
 <script lang="ts">
-  import Closet from "<path>/sweater-vest-suede/Closet.svelte";
+  import Counter from "./Counter.svelte";
+
+  let count = $state(2);
+  let el: HTMLDivElement;
 </script>
 
-<Closet glob={import.meta.glob("/src/lib/**/*.test.svelte")} />
+<div bind:this={el}>
+  <Counter count={count} />
+</div>
 ```
 
-The glob pattern controls which test files appear in the list. Adjust it to match your project's directory structure.
-
-### 2. Exclude the route from production builds
-
-Prefix your build command with `with-exclude-tests-routes-from-build.sh` from `templates/sveltekit/`:
-
-```jsonc
-{
-  "scripts": {
-    "build": "<path>/sweater-vest-suede/templates/sveltekit/with-exclude-tests-routes-from-build.sh vite build",
-  },
-}
-```
-
-This temporarily renames `+page.svelte` → `_page.svelte` for the duration of the build, then restores it. The tests route is excluded from the production bundle without touching your source files.
-
-### 3. Browse tests interactively
-
-```sh
-npm run dev
-# Navigate to http://localhost:<port>/tests
-```
-
----
-
-## 4. Automated reporting
-
-The report script starts a containerized Playwright browser, drives it through every test file the Closet knows about, collects results, and writes a Markdown report. **Docker is required** — no browser needs to be installed locally.
-
-### Running the report
-
-```sh
-# Terminal 1 — keep this running
-npm run dev
-
-# Terminal 2
-npm run report
-# → prints a summary to stdout
-# → writes fashion-show.md
-```
-
-Open `fashion-show.md` to see the full report with pass/fail status, duration, error messages, and any screenshots or notes added during the test run.
-
-### CLI flags
-
-| Flag                    | Shorthand | Description                                             | Default                         |
-| ----------------------- | --------- | ------------------------------------------------------- | ------------------------------- |
-| `--server <url>`        | `-s`      | URL where your dev server is running.                   | `http://<devcontainer-ip>:5173` |
-| `--closet <path>`       | `-c`      | Path on `server` where `Closet.svelte` is rendered.     | `/`                             |
-| `--browser <name>`      | `-b`      | Browser to use. Repeatable for multi-browser runs.      | `chromium`                      |
-| `--output <path>`       | `-o`      | Output path for the Markdown report. Pass `""` to skip. | `./fashion-show.md`             |
-| `--component <pattern>` | `-m`      | Only open components whose path matches this regex.     | (all)                           |
-| `--test <pattern>`      | `-t`      | Only run tests whose name or id matches this regex.     | (all)                           |
-| `--forward <ports>`     | `-f`      | Ports to publish on the browser's own `localhost`.      | (none)                          |
-| `--silence <seconds>`   | `-w`      | Seconds without a word from any browser before giving up. | `120`                        |
-
-#### Secure-context APIs
-
-`SharedArrayBuffer`, service workers, `crypto.subtle` and the rest are only
-given to a _trustworthy_ origin — https, or `localhost`. A dev server reached at
-the devcontainer's address is neither, and a page needing one of those fails
-with no hint as to why.
-
-`--forward` publishes a port on the browser container's own loopback address, so
-point `--server` at `localhost` to use it:
-
-```sh
-npm run report -- --server http://localhost:5173 --forward 5173,1234
-```
-
-Forward every port the page talks to, not only the one serving it.
-
-#### Slow suites
-
-`--silence` is an idle timeout, not a deadline: it fires when nothing has been
-heard from any browser for that long, so a suite may run for as long as it likes
-provided it keeps reporting. Raise it above the duration of the slowest _single_
-test — a first test that boots a language runtime is the usual reason.
-
-Patterns are case-insensitive regular expressions. Tests that don't match `--test` are recorded as `skipped` in the report rather than omitted entirely.
-
-#### Examples
-
-```sh
-# Only components whose path contains "Button"
-npm run report -- --component Button
-
-# Only tests named "hover", across all components
-npm run report -- --test hover
-
-# Both: Button component, hover tests only
-npm run report -- --component Button --test hover
-
-# Run on Firefox instead of Chromium
-npm run report -- --browser firefox
-
-# Write to a custom path
-npm run report -- --output ./reports/latest.md
-```
-
-### Programmatic API
+Verified by:
 
 ```ts
-import { generateReport } from "<path>/sweater-vest-suede/report";
-
-const summary = await generateReport({
-  server: "http://localhost:5173",
-  browsers: ["chromium", "firefox", "webkit"],
-  output: "./reports/latest.md",
-  component: /Button/i, // optional regex filter
-  test: /hover/i, // optional regex filter
-});
-
-console.log(summary?.passed, "passed,", summary?.failed, "failed");
+expect(el.textContent).toContain("2");
+count = 3;
+flushSync();
+expect(el.textContent).toContain("3");
 ```
+````
 
-`generateReport` returns a `Report.Result.Summary` with `total`, `passed`, `failed`, and `skipped` counts, or `undefined` if generation fails.
+What is rewritten, all on the AST: the component's own type import becomes an
+import under the name the snippet gave it; a pocket becomes `$state` locals
+(`pocket.count` reads `count` throughout) unless the snippet also hands the
+pocket around whole, in which case it stays an object; `typeof` imports and
+`Sweater` components become real imports; `{test(…)}` and markup that only
+shows the test (`<Status {test} />`, `{test.state}`) leave the usage; the
+component's `<style>` comes along only if the markup uses a class from it;
+and every import nothing refers to is dropped, the DSL's first. An example
+(no `Test`) gets the usage alone. `--header-level` sets a component's heading;
+its snippets sit one level below. The editor extension shows the same for an
+extracted file.
 
-### Multi-browser
+## Where things are written
 
-Passing multiple `--browser` flags (or the `browsers` array in the programmatic API) runs every test in each browser. Results are grouped by component and test, with a separate run entry per browser. Tests that fail in one browser but pass in others are immediately visible in the report.
+`.derived/` inside this folder holds `diagnostics.json`: what the plugin could
+not hand in, which the editor reads. It ignores itself in git; delete it freely.
 
-### CI
-
-The report script exits non-zero if any tests fail (or if report generation itself errors). Standard CI setup:
-
-```sh
-npm run dev &
-# wait for dev server to be ready, then:
-npm run report -- --server http://localhost:5173
-```
-
-If you need to specify the server URL explicitly (e.g. because the runner is not a devcontainer), pass `--server`. The Docker requirement still applies — ensure the CI runner has Docker available.
-
----
-
-## 5. Making reports informative
-
-### Captures
-
-Call `harness.capture("png")` at any point in the test body to snapshot the vest container at that moment. Call it multiple times to capture a sequence of states.
+When the dev server runs in a container whose port is published somewhere
+else, tell the plugin where, so the editor opens pages at the published
+address:
 
 ```ts
-body={async (harness) => {
-  const pocket = harness.set(new Pocket());
-  await harness.definition("el");
-
-  harness.capture("png");  // before interaction
-
-  await harness.withUserFocus(async (userEvent) => {
-    await userEvent.click(pocket.button);
-  });
-
-  harness.capture("png");  // after interaction
-  harness.expect(pocket.result).toBe("clicked");
-}}
+sweaterVest({ external: `http://localhost:${process.env.SWEATER_VEST_PORT}` });
 ```
 
-Captures are embedded directly in the Markdown report as data URIs. Supported types: `"png"`, `"jpeg"`, `"svg"`. You do not need to `await` the capture — the report script waits for all pending images before recording the result.
+The editor asks the running server for it, so nothing but `vite.config.ts`
+needs to know. The report runs beside the server and reaches it at
+`localhost:5173` unless told otherwise with `--server`.
 
-### Notes
+## Scripts
 
-Call `harness.note(text)` to add a free-form text annotation that appears in the report card alongside captures:
+Run from `vscode-extension/`:
 
-```ts
-body={async (harness) => {
-  harness.note("Initial render — no value set yet");
-
-  const pocket = harness.set(new Pocket({ value: "hello" }));
-  await harness.delay({ milliseconds: 50 });
-
-  harness.note(`After 50 ms — value is "${pocket.value}"`);
-  harness.capture("png");
-
-  harness.expect(pocket.value).toBe("hello");
-}}
-```
-
-`note()` is a no-op when running without a report server attached, so it never affects interactive development.
-
-### Named tests
-
-Always give tests a `name`. Without one, a test falls back to its position — `test 3` — in both the report and the stdout summary, which tells you where the failure is but not what it was checking.
-
-```svelte
-<Sweater name="renders placeholder when value is empty" body={…}>
-```
-
-Use `id` alongside `name` when you want a stable identifier that survives renaming (useful for correlating results across multiple report runs):
-
-```svelte
-<Sweater name="renders placeholder when value is empty" id="button-placeholder" body={…}>
-```
+| Script                      | What it does                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| `npm run install-extension` | builds, packages and installs the editor extension into VS Code (or VSCodium, Cursor) |
+| `npm run build`             | only builds it                                                                        |

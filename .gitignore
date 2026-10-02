@@ -2,3 +2,5 @@
 !.dependencies/*.gitrepo
 !.dependencies/package.json
 !.dependencies/requirements.txt
+.derived/
+*.temp.svelte
