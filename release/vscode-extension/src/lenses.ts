@@ -39,6 +39,7 @@ function testLenses(test: DiscoveredTest, id: string, outcome: Outcome | undefin
 const EXTRACTED_ACTIONS = [
   ["$(play) Run", "runExtracted"],
   ["$(debug-alt) Debug", "debugExtracted"],
+  ["$(markdown) Markdown", "markdownExtracted"],
   ["$(trash) Delete", "deleteExtracted"],
 ] as const;
 

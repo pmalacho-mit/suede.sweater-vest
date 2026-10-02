@@ -51,6 +51,10 @@
       {
         "command": "sweater-vest.deleteExtracted",
         "title": "Sweater Vest: Delete Extracted Test"
+      },
+      {
+        "command": "sweater-vest.markdownExtracted",
+        "title": "Sweater Vest: Show Extracted Test as Markdown"
       }
     ],
     "menus": {
@@ -92,6 +96,10 @@
         {
           "command": "sweater-vest.showProblem",
           "when": "false"
+        },
+        {
+          "command": "sweater-vest.markdownExtracted",
+          "when": "resourceFilename =~ /\\\\.vest\\\\.temp\\\\.svelte$/"
         }
       ]
     },

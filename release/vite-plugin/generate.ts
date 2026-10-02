@@ -4,7 +4,12 @@ import { generatedId, importPath, testName } from "./names.ts";
 import { generatedSourceMap } from "./sourcemap.ts";
 
 /** A pocket's initial value, printed, and the value imports it needs. */
-export type PocketValue = { initial: string; imports: Map<string, Set<string>> };
+export type PocketValue = {
+  initial: string;
+  /** each member that has a value, printed */
+  members: [member: string, value: string][];
+  imports: Map<string, Set<string>>;
+};
 
 export type GenerateOptions = {
   /** Absolute path of the runtime module the generated file imports from. */

@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 
 import { hasTests } from "./discovery.ts";
 import { ID, orComplain } from "./editor.ts";
-import { debugExtracted, deleteExtracted, extractTest, runExtracted } from "./extracted.ts";
+import { debugExtracted, deleteExtracted, extractTest, markdownOfExtracted, runExtracted } from "./extracted.ts";
 import { generatedViews } from "./generated.ts";
 import { extractedFileLenses, testFileLenses } from "./lenses.ts";
 import { forgetLibrary } from "./library.ts";
@@ -65,6 +65,7 @@ function generatedCommands({ output, showAgainst }: Parts) {
       if (text !== null) await showAgainst(uri, text, "what Vitest sees");
     }),
     command("runExtracted", runExtracted),
+    command("markdownExtracted", (uri: vscode.Uri) => markdownOfExtracted(uri, output)),
     command("debugExtracted", debugExtracted),
     command("deleteExtracted", deleteExtracted),
   ];

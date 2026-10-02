@@ -368,6 +368,58 @@ node <path>/cli.ts --clean-extracted [dir]                  # delete extracted t
 The [editor extension](./vscode-extension/README.md) extracts on a click and
 puts Run, Debug and Delete at the top of the file it wrote.
 
+## Snippets as documentation
+
+A snippet is already how a reader would use the component, with a test
+attached. The command line prints it that way, for a README:
+
+```
+node <path>/cli.ts src/lib/Counter.svelte --markdown                 # every snippet of the component
+node <path>/cli.ts src/lib/Counter.svelte counts --markdown          # one snippet
+node <path>/cli.ts src/lib --markdown --header-level 3 > docs.md     # every component under a directory
+```
+
+Each snippet becomes a heading, the usage as a Svelte component, and — for a
+test — "Verified by" with the body of its test:
+
+````markdown
+### counts
+
+```svelte
+<script lang="ts">
+  import Counter from "./Counter.svelte";
+
+  let count = $state(2);
+  let el: HTMLDivElement;
+</script>
+
+<div bind:this={el}>
+  <Counter count={count} />
+</div>
+```
+
+Verified by:
+
+```ts
+expect(el.textContent).toContain("2");
+count = 3;
+flushSync();
+expect(el.textContent).toContain("3");
+```
+````
+
+What is rewritten, all on the AST: the component's own type import becomes an
+import under the name the snippet gave it; a pocket becomes `$state` locals
+(`pocket.count` reads `count` throughout) unless the snippet also hands the
+pocket around whole, in which case it stays an object; `typeof` imports and
+`Sweater` components become real imports; `{test(…)}` and markup that only
+shows the test (`<Status {test} />`, `{test.state}`) leave the usage; the
+component's `<style>` comes along only if the markup uses a class from it;
+and every import nothing refers to is dropped, the DSL's first. An example
+(no `Test`) gets the usage alone. `--header-level` sets a component's heading;
+its snippets sit one level below. The editor extension shows the same for an
+extracted file.
+
 ## Where things are written
 
 `.derived/` inside this folder holds `diagnostics.json`: what the plugin could

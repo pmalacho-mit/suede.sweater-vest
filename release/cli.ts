@@ -14,6 +14,7 @@ import { scrub } from "./vite-plugin/scrub.ts";
 import { collectorFor, componentsFile, runtimeFile } from "./vite-plugin/plugin.ts";
 import { generatedId, posix, testName } from "./vite-plugin/names.ts";
 import { SUFFIX, extract, extracted, tempPathFor } from "./extract.ts";
+import { document, markdownForComponent, markdownOf } from "./document.ts";
 
 import type {
   Expect,
@@ -29,6 +30,7 @@ const DESCRIPTION = [
   "  cli.ts <component> --list          the component's test snippets, as JSON",
   "  cli.ts <component> --collector     the component as Vitest is handed it",
   "  cli.ts --clean-extracted [dir]     delete extracted tests under dir (default: the working directory)",
+  "  cli.ts <component|dir> [snippet] --markdown [--header-level N]   the snippets as documentation, for a README",
 ].join("\n");
 
 /** What was asked for, read off an argv; kept apart from acting on it so it can be tested without a process. */
@@ -49,6 +51,12 @@ const parse = (argv: string[]) => {
       "Write the generated test beside the component instead of printing it, and print its path.",
       false,
     ),
+    cli.flag(
+      "markdown",
+      "Print the snippets as documentation: the usage, then what verifies it. A directory documents every component under it.",
+      false,
+    ),
+    cli.flag(["header-level", "h"], "The heading level of a component in the Markdown; its snippets sit one below.", 2),
     cli.flag(
       "tsconfig",
       "The tsconfig file name, found upward from the working directory.",
@@ -75,8 +83,11 @@ const parse = (argv: string[]) => {
           ? "clean"
           : args.extract
             ? "extract"
-            : "test",
+            : args.markdown
+              ? "markdown"
+              : "test",
     tsconfig: args.tsconfig ?? "tsconfig.json",
+    headerLevel: args["header-level"],
     force: args.force,
     help: args.help,
   } as const;
@@ -231,6 +242,36 @@ async function writeExtracted(
   return `${shown(target)}\n`;
 }
 
+async function printMarkdown(target: string, snippet: string | undefined, level: number, tsconfig: string) {
+  const { pocketValues } = await import("./vite-plugin/pocket-values.ts");
+  const values = pocketValues(process.cwd(), tsconfig);
+  const root = path.resolve(target);
+  const components = fs.statSync(root).isDirectory() ? [...componentsUnder(root)] : [root];
+  const sections: string[] = [];
+  for (const file of components) {
+    const analysis = analyze(file, fs.readFileSync(file, "utf8"));
+    const snippets = analysis.snippets.filter((s) => isGeneratable(s) && (!snippet || s.name === snippet));
+    if (snippet && !snippets.length) throw new Error(`no test snippet named ${snippet} in ${shown(file)}`);
+    const docs = snippets.map((s) => {
+      const pockets = new Map([...values.forSnippet(analysis, s)].map(([name, value]) => [name, value.members]));
+      return document(analysis, s, { components: componentsFile, pockets });
+    });
+    if (!docs.length) continue;
+    sections.push(snippet ? markdownOf(docs[0]!, level) : markdownForComponent(analysis, docs, level));
+  }
+  return `${sections.join("\n")}`;
+}
+
+// every component with snippets under a directory
+function* componentsUnder(dir: string): Generator<string> {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const at = path.join(dir, entry.name);
+    if (entry.isDirectory() && !entry.name.startsWith(".") && !SKIPPED.has(entry.name)) yield* componentsUnder(at);
+    else if (entry.isFile() && entry.name.endsWith(".svelte") && !entry.name.endsWith(".vest.svelte") && !entry.name.endsWith(SUFFIX))
+      if (fs.readFileSync(at, "utf8").includes("import.meta.vitest")) yield at;
+  }
+}
+
 const printCollector = (analysis: Analysis) => {
   const ids = analysis.snippets
     .filter(isGeneratable)
@@ -239,8 +280,9 @@ const printCollector = (analysis: Analysis) => {
     .code;
 };
 
-async function run({ file, snippet, mode, tsconfig, force, help }: Parsed) {
+async function run({ file, snippet, mode, tsconfig, force, help, headerLevel }: Parsed) {
   if (mode === "clean") return cleanExtracted(path.resolve(file ?? "."), force);
+  if (mode === "markdown" && file) return void process.stdout.write(await printMarkdown(file, snippet, headerLevel, tsconfig));
   if (!file || ((mode === "test" || mode === "extract") && !snippet)) {
     console.error(help());
     process.exit(2);

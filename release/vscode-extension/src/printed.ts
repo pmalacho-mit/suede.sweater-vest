@@ -38,4 +38,7 @@ export const printed = {
   extract: async (uri: vscode.Uri, snippet: string, output: vscode.OutputChannel) =>
     path.resolve(folderOf(uri), (await ask(uri, [snippet, "--extract"], output)).trim()),
   collector: (uri: vscode.Uri, output: vscode.OutputChannel) => ask(uri, ["--collector"], output),
+  /** The snippet as documentation: its usage, then what verifies it. */
+  markdown: (uri: vscode.Uri, snippet: string, output: vscode.OutputChannel) =>
+    ask(uri, [snippet, "--markdown", "--header-level", "2"], output),
 };

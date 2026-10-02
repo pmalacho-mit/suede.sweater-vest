@@ -26,7 +26,9 @@ path. It parses with your project's own Svelte compiler and runs the library's
   snippets plus the block that imports one generated test per snippet.
 - **Extract** — writes the test out as a real file beside the component
   (`Counter.counts.vest.temp.svelte`) and opens it in the same tab group.
-- **Run · Debug · Delete** — at the top of an extracted file. *Debug* launches
+- **Run · Debug · Markdown · Delete** — at the top of an extracted file.
+  *Markdown* opens the snippet as documentation beside it: the usage a reader
+  would write, then "Verified by" with the test's body. *Debug* launches
   Vitest under the Node debugger on that one file, in a single process, with no
   test timeout.
 - **Failures** — clicking a failed lens opens the output with Vitest's message

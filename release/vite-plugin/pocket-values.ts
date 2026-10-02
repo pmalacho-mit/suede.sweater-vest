@@ -187,8 +187,10 @@ export function pocketValues(cwd: string, tsconfig: string) {
         const alias = aliases.get(aliasName(snippet.name, p.name));
         const type = alias?.type;
         if (!type || !ts.isTypeLiteralNode(type)) continue;
+        const object = lowerObject(cx, type);
         values.set(p.name, {
-          initial: printExpr(lowerObject(cx, type)),
+          initial: printExpr(object),
+          members: object.kind === "object" ? object.entries.map(([k, v]) => [k, printExpr(v)]) : [],
           imports: cx.test.imports,
         });
       }

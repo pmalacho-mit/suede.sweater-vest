@@ -72,6 +72,17 @@ export async function debugExtracted(uri: vscode.Uri) {
     void vscode.window.showErrorMessage(`Could not start a debug session for ${path.basename(relative)}.`);
 }
 
+/** The extract's snippet as Markdown, in an editor beside it. */
+export async function markdownOfExtracted(uri: vscode.Uri, output: vscode.OutputChannel) {
+  const origin = extracted(contentsOf(uri));
+  if (!origin) return;
+  const source = vscode.Uri.file(path.resolve(folderOf(uri), origin.source));
+  const text = await orComplain(printed.markdown(source, origin.snippet, output), output, `Could not document ${origin.snippet}.`);
+  if (text === null) return;
+  const document = await vscode.workspace.openTextDocument({ language: "markdown", content: text });
+  await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.Beside, preview: false });
+}
+
 export async function deleteExtracted(uri: vscode.Uri) {
   if (!(await mayDelete(uri))) return;
   // closed first, or its tab is left showing a file that is gone
