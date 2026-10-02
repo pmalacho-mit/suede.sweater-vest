@@ -7,7 +7,6 @@ export default defineConfig({
   plugins: [
     sveltekit(),
     sweaterVest({
-      project: "sweater",
       external: process.env.SWEATER_VEST_PORT
         ? `http://localhost:${process.env.SWEATER_VEST_PORT}`
         : undefined,
@@ -20,15 +19,7 @@ export default defineConfig({
   test: {
     expect: { requireAssertions: true },
     projects: [
-      {
-        extends: true,
-        resolve: { conditions: ["browser"] },
-        test: {
-          name: "sweater",
-          environment: "jsdom",
-          include: [],
-        },
-      },
+      sweaterVest.project(),
       {
         extends: true,
         // the library's own tests are namespace tests, written beside what they test
