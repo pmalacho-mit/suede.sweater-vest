@@ -4,9 +4,9 @@
 ; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
 ;
 [subrepo]
-	remote = git@github.com:pmalacho-mit/suede.typescript-namespace-tests.git
+	remote = git@github.com:pmalacho-mit/suede.nests.git
 	branch = release
 	commit = d75fe5df38f110e3834ef6898fc6e0e71523491d
-	parent = d5ca65de5ed68ca86eebd5fd71c92f10f35ef542
+	parent = d87ddac9e308d5d0112ebe8917b74c617a776093
 	method = merge
 	cmdver = 0.4.9
