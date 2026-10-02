@@ -19,7 +19,13 @@ export const isDslModule = (specifier: string): boolean => {
 export const MARKER = "import.meta.vitest";
 
 /** Something the plugin cannot do with a snippet; an `error` stops the run, since the test would otherwise be silently skipped. */
-export type Warning = { line: number; column: number; length: number; message: string; severity: "error" | "warning" };
+export type Warning = {
+  line: number;
+  column: number;
+  length: number;
+  message: string;
+  severity: "error" | "warning";
+};
 
 export type ImportBinding =
   | { kind: "default"; local: string; typeOnly: boolean }
@@ -83,18 +89,32 @@ export type Analysis = {
   warnings: Warning[];
 };
 
-type Node = { type: string; start?: number; end?: number } & Record<string, unknown>;
+type Node = { type: string; start?: number; end?: number } & Record<
+  string,
+  unknown
+>;
 
 const isNode = (value: unknown): value is Node =>
-  typeof value === "object" && value !== null && typeof (value as Node).type === "string";
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as Node).type === "string";
 
-const SKIPPED_KEYS = new Set(["loc", "metadata", "leadingComments", "trailingComments"]);
+const SKIPPED_KEYS = new Set([
+  "loc",
+  "metadata",
+  "leadingComments",
+  "trailingComments",
+]);
 
 // a type is not a reference to anything at run time
 const isType = (node: Node) => node.type.startsWith("TS");
 
 /** Every run-time node under `node`, depth first, with the key it hangs from in its parent. */
-function* walk(node: Node, parent: Node | null = null, key = ""): Generator<[Node, Node | null, string]> {
+function* walk(
+  node: Node,
+  parent: Node | null = null,
+  key = "",
+): Generator<[Node, Node | null, string]> {
   if (isType(node)) return;
   yield [node, parent, key];
   for (const [k, value] of Object.entries(node)) {
@@ -108,12 +128,17 @@ function* walk(node: Node, parent: Node | null = null, key = ""): Generator<[Nod
 // a property name is not a reference to a binding of the same name
 const isReference = (node: Node, parent: Node | null, key: string) =>
   node.type === "Identifier" &&
-  !(parent?.type === "MemberExpression" && key === "property" && !parent.computed) &&
+  !(
+    parent?.type === "MemberExpression" &&
+    key === "property" &&
+    !parent.computed
+  ) &&
   !(parent?.type === "Property" && key === "key" && !parent.computed);
 
 const lineIndex = (source: string) => {
   const starts = [0];
-  for (let i = 0; i < source.length; i++) if (source[i] === "\n") starts.push(i + 1);
+  for (let i = 0; i < source.length; i++)
+    if (source[i] === "\n") starts.push(i + 1);
   return {
     lineOf: (offset: number) => {
       let lo = 0;
@@ -152,11 +177,15 @@ const importsOf = (program: AST.Script["content"] | undefined): Import[] => {
     const bindings: ImportBinding[] = [];
     for (const s of statement.specifiers as Node[]) {
       const local = (s.local as Node).name as string;
-      if (s.type === "ImportDefaultSpecifier") bindings.push({ kind: "default", local, typeOnly });
-      else if (s.type === "ImportNamespaceSpecifier") bindings.push({ kind: "namespace", local, typeOnly });
+      if (s.type === "ImportDefaultSpecifier")
+        bindings.push({ kind: "default", local, typeOnly });
+      else if (s.type === "ImportNamespaceSpecifier")
+        bindings.push({ kind: "namespace", local, typeOnly });
       else {
         const imported = s.imported as Node;
-        const name = (imported.type === "Identifier" ? imported.name : imported.value) as string;
+        const name = (
+          imported.type === "Identifier" ? imported.name : imported.value
+        ) as string;
         bindings.push({
           kind: "named",
           local,
@@ -177,14 +206,19 @@ const importsOf = (program: AST.Script["content"] | undefined): Import[] => {
 };
 
 const resolvesToSelf = (file: string, specifier: string) =>
-  specifier.startsWith(".") && path.resolve(path.dirname(file), specifier) === file;
+  specifier.startsWith(".") &&
+  path.resolve(path.dirname(file), specifier) === file;
 
 /** `import type Self from "./This.svelte"`: the component's own type, under the name it chose. */
 export const selfImport = (file: string, imports: Import[]): string | null => {
   for (const i of imports)
     if (resolvesToSelf(file, i.specifier))
       for (const b of i.bindings)
-        if (b.typeOnly && (b.kind === "default" || (b.kind === "named" && b.imported === "default")))
+        if (
+          b.typeOnly &&
+          (b.kind === "default" ||
+            (b.kind === "named" && b.imported === "default"))
+        )
           return b.local;
   return null;
 };
@@ -203,18 +237,23 @@ const importLocals = (imports: Import[]) =>
 
 const typeOf = (param: Node): Node | null => {
   const annotation = param.typeAnnotation as Node | undefined;
-  return annotation && isNode(annotation.typeAnnotation) ? annotation.typeAnnotation : null;
+  return annotation && isNode(annotation.typeAnnotation)
+    ? annotation.typeAnnotation
+    : null;
 };
 
 const queried = (type: Node): string | null => {
   const name = type.exprName as Node | undefined;
-  return type.type === "TSTypeQuery" && name?.type === "Identifier" ? (name.name as string) : null;
+  return type.type === "TSTypeQuery" && name?.type === "Identifier"
+    ? (name.name as string)
+    : null;
 };
 
 // `typeof A.B`: the namespace and the member
 const queriedMember = (type: Node): { root: string; member: string } | null => {
   const name = type.exprName as Node | undefined;
-  if (type.type !== "TSTypeQuery" || name?.type !== "TSQualifiedName") return null;
+  if (type.type !== "TSTypeQuery" || name?.type !== "TSQualifiedName")
+    return null;
   const left = name.left as Node;
   const right = name.right as Node;
   return left.type === "Identifier" && right.type === "Identifier"
@@ -224,7 +263,9 @@ const queriedMember = (type: Node): { root: string; member: string } | null => {
 
 const referenced = (type: Node): string | null => {
   const name = type.typeName as Node | undefined;
-  return type.type === "TSTypeReference" && name?.type === "Identifier" && !type.typeArguments
+  return type.type === "TSTypeReference" &&
+    name?.type === "Identifier" &&
+    !type.typeArguments
     ? (name.name as string)
     : null;
 };
@@ -237,15 +278,21 @@ function classify(
   sweaters: Set<string>,
   locals: Set<string>,
 ): Param {
-  const name = param.type === "Identifier" ? (param.name as string) : source.slice(param.start, param.end);
+  const name =
+    param.type === "Identifier"
+      ? (param.name as string)
+      : source.slice(param.start, param.end);
   const type = typeOf(param);
   const typeText = type ? source.slice(type.start, type.end) : "";
-  if (!type || param.type !== "Identifier") return { kind: "unsupported", name, typeText };
+  if (!type || param.type !== "Identifier")
+    return { kind: "unsupported", name, typeText };
   const query = queried(type);
   if (query === self) return { kind: "subject", name };
-  if (query && locals.has(query)) return { kind: "value", name, local: query, typeText };
+  if (query && locals.has(query))
+    return { kind: "value", name, local: query, typeText };
   const member = queriedMember(type);
-  if (member && sweaters.has(member.root)) return { kind: "sweater", name, member: member.member, typeText };
+  if (member && sweaters.has(member.root))
+    return { kind: "sweater", name, member: member.member, typeText };
   const reference = referenced(type);
   if (reference && tests.has(reference)) return { kind: "test", name };
   if (type.type === "TSTypeLiteral") return { kind: "pocket", name, typeText };
@@ -259,7 +306,10 @@ function* bound(pattern: Node | null | undefined): Generator<string> {
     case "Identifier":
       return void (yield pattern.name as string);
     case "ObjectPattern":
-      for (const p of pattern.properties as Node[]) yield* bound(p.type === "RestElement" ? (p.argument as Node) : (p.value as Node));
+      for (const p of pattern.properties as Node[])
+        yield* bound(
+          p.type === "RestElement" ? (p.argument as Node) : (p.value as Node),
+        );
       return;
     case "ArrayPattern":
       for (const e of pattern.elements as (Node | null)[]) yield* bound(e);
@@ -272,15 +322,26 @@ function* bound(pattern: Node | null | undefined): Generator<string> {
 }
 
 // what the scripts declare at their top level, other than imports
-function* declaredIn(program: AST.Script["content"] | undefined): Generator<string> {
+function* declaredIn(
+  program: AST.Script["content"] | undefined,
+): Generator<string> {
   if (!program) return;
   for (const statement of program.body as unknown as Node[]) {
     if (statement.type === "VariableDeclaration")
-      for (const d of statement.declarations as Node[]) yield* bound(d.id as Node);
-    else if (statement.type === "FunctionDeclaration" || statement.type === "ClassDeclaration")
+      for (const d of statement.declarations as Node[])
+        yield* bound(d.id as Node);
+    else if (
+      statement.type === "FunctionDeclaration" ||
+      statement.type === "ClassDeclaration"
+    )
       yield* bound(statement.id as Node);
-    else if (statement.type === "ExportNamedDeclaration" && isNode(statement.declaration))
-      yield* declaredIn({ body: [statement.declaration] } as unknown as AST.Script["content"]);
+    else if (
+      statement.type === "ExportNamedDeclaration" &&
+      isNode(statement.declaration)
+    )
+      yield* declaredIn({
+        body: [statement.declaration],
+      } as unknown as AST.Script["content"]);
   }
 }
 
@@ -293,7 +354,8 @@ function* boundInside(snippet: Node): Generator<string> {
         for (const p of node.parameters as Node[]) yield* bound(p);
         break;
       case "ConstTag":
-        for (const d of (node.declaration as Node).declarations as Node[]) yield* bound(d.id as Node);
+        for (const d of (node.declaration as Node).declarations as Node[])
+          yield* bound(d.id as Node);
         break;
       case "EachBlock":
         yield* bound(node.context as Node);
@@ -324,36 +386,61 @@ function unreachableIn(snippet: Node, declared: Set<string>): string[] {
   const own = new Set(boundInside(snippet));
   const found = new Set<string>();
   for (const [node, parent, key] of walk(snippet))
-    if (isReference(node, parent, key) && declared.has(node.name as string) && !own.has(node.name as string))
+    if (
+      isReference(node, parent, key) &&
+      declared.has(node.name as string) &&
+      !own.has(node.name as string)
+    )
       found.add(node.name as string);
   return [...found];
 }
 
 export function analyze(file: string, source: string): Analysis {
   const ast = parse(source, { modern: true, filename: file });
-  const imports = [...importsOf(ast.module?.content), ...importsOf(ast.instance?.content)];
+  const imports = [
+    ...importsOf(ast.module?.content),
+    ...importsOf(ast.instance?.content),
+  ];
   const self = selfImport(file, imports);
   const { lineOf, columnOf } = lineIndex(source);
   const warnings: Warning[] = [];
   const snippets: TestSnippet[] = [];
 
-  const warn = (node: Node, message: string, severity: Warning["severity"] = "error") => {
+  const warn = (
+    node: Node,
+    message: string,
+    severity: Warning["severity"] = "error",
+  ) => {
     const line = lineOf(node.start!);
-    warnings.push({ line, column: columnOf(node.start!, line), length: node.end! - node.start!, message, severity });
+    warnings.push({
+      line,
+      column: columnOf(node.start!, line),
+      length: node.end! - node.start!,
+      message,
+      severity,
+    });
   };
 
   if (self) {
     const tests = dslLocals(imports, "Test");
     const sweaters = dslLocals(imports, "Sweater");
     const locals = importLocals(imports);
-    const declared = new Set([...declaredIn(ast.module?.content), ...declaredIn(ast.instance?.content)]);
+    const declared = new Set([
+      ...declaredIn(ast.module?.content),
+      ...declaredIn(ast.instance?.content),
+    ]);
     const nodes = ast.fragment.nodes as unknown as Node[];
     const root = ast as unknown as Node;
 
     const usedOutside = (snippet: Node, name: string) => {
       for (const [node, parent, key] of walk(root)) {
         if (node === snippet) continue;
-        if (isReference(node, parent, key) && node.name === name && !within(snippet, node)) return true;
+        if (
+          isReference(node, parent, key) &&
+          node.name === name &&
+          !within(snippet, node)
+        )
+          return true;
       }
       return false;
     };
@@ -366,7 +453,9 @@ export function analyze(file: string, source: string): Analysis {
       if (!first || queried(typeOf(first) ?? { type: "" }) !== self) continue;
       if (usedOutside(node, name)) continue;
 
-      const classified = params.map((p) => classify(p, source, self, tests, sweaters, locals));
+      const classified = params.map((p) =>
+        classify(p, source, self, tests, sweaters, locals),
+      );
       for (const [i, p] of classified.entries()) {
         if (p.kind !== "unsupported") continue;
         warn(
@@ -408,7 +497,10 @@ export function analyze(file: string, source: string): Analysis {
 }
 
 const within = (outer: Node, node: Node) =>
-  node.start !== undefined && outer.start !== undefined && node.start >= outer.start && node.end! <= outer.end!;
+  node.start !== undefined &&
+  outer.start !== undefined &&
+  node.start >= outer.start &&
+  node.end! <= outer.end!;
 
 /** A snippet the plugin can generate a test from: every parameter is understood, and nothing reaches into the script. */
 export const isGeneratable = (snippet: TestSnippet) =>
@@ -416,10 +508,21 @@ export const isGeneratable = (snippet: TestSnippet) =>
   snippet.params.filter((p) => p.kind === "subject").length === 1 &&
   !snippet.unreachable.length;
 
-export const hasTest = (snippet: TestSnippet) => snippet.params.some((p) => p.kind === "test");
+export const hasTest = (snippet: TestSnippet) =>
+  snippet.params.some((p) => p.kind === "test");
 
-import type { Expect, Invoke, Table } from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
-import type { errorsOf, lineOf, paramsOf, snippetNames, warningsOf } from "../_internal/harness.ts";
+import type {
+  Expect,
+  Invoke,
+  Table,
+} from "../../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
+import type {
+  errorsOf,
+  lineOf,
+  paramsOf,
+  snippetNames,
+  warningsOf,
+} from "../_internal/harness.ts";
 
 declare namespace analyze {
   type Markup = `
@@ -445,7 +548,11 @@ declare namespace analyze {
 `;
 
   /** a snippet is the library's when it is unused and takes the component's own type first */
-  export type Found = Expect<Invoke<typeof snippetNames, [Markup]>, "=", ["tested", "example"]>;
+  export type Found = Expect<
+    Invoke<typeof snippetNames, [Markup]>,
+    "=",
+    ["tested", "example"]
+  >;
 
   /** each parameter is read for what it is */
   export type Params = Table<
@@ -514,7 +621,11 @@ import { helper } from "./helper.ts";
 `;
 
   /** a reference inside the snippet's own body does not make it used */
-  export type OwnBody = Expect<Invoke<typeof snippetNames, [Shadowed]>, "=", ["one"]>;
+  export type OwnBody = Expect<
+    Invoke<typeof snippetNames, [Shadowed]>,
+    "=",
+    ["one"]
+  >;
 
   type Property = `
 {#snippet two(C: typeof Self, test: Test)}
@@ -524,7 +635,11 @@ import { helper } from "./helper.ts";
 `;
 
   /** nor does a property that happens to share its name */
-  export type PropertyName = Expect<Invoke<typeof snippetNames, [Property]>, "=", ["two"]>;
+  export type PropertyName = Expect<
+    Invoke<typeof snippetNames, [Property]>,
+    "=",
+    ["two"]
+  >;
 
   type Passed = `
 {#snippet three(C: typeof Self, test: Test)}
@@ -583,7 +698,11 @@ function helper() {}
 `;
 
   /** what the snippet binds for itself — a parameter, a const, an each context, a local — shadows the script */
-  export type Shadowed = Expect<Invoke<typeof warningsOf, [OwnNames, Script]>, "=", []>;
+  export type Shadowed = Expect<
+    Invoke<typeof warningsOf, [OwnNames, Script]>,
+    "=",
+    []
+  >;
 
   type TypesAndNested = `
 {#snippet typed(C: typeof Self, pocket: { count: Widen<1>; limit?: { helper: string } }, test: Test)}
@@ -594,5 +713,9 @@ function helper() {}
 `;
 
   /** a name in a type annotation is not a reference, and a nested snippet's name is its own */
-  export type NotReferences = Expect<Invoke<typeof warningsOf, [TypesAndNested, Script]>, "=", []>;
+  export type NotReferences = Expect<
+    Invoke<typeof warningsOf, [TypesAndNested, Script]>,
+    "=",
+    []
+  >;
 }

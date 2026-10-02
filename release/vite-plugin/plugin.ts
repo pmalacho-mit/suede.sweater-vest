@@ -28,7 +28,12 @@ import { CONFIG_ENDPOINT, TESTS_ENDPOINT } from "../endpoints.ts";
 import { routeHider, type Alias } from "./routes.ts";
 import { DEFAULT_PROJECT, project as vestProject } from "./project.ts";
 
-export { DEFAULT_PROJECT, type SweaterVestProject, type ProjectOptions, type Environment } from "./project.ts";
+export {
+  DEFAULT_PROJECT,
+  type SweaterVestProject,
+  type ProjectOptions,
+  type Environment,
+} from "./project.ts";
 
 import type { Plugin, ViteUserConfig } from "vitest/config";
 
@@ -223,7 +228,12 @@ function sweaterVest({
     // a named project collects when its name is one of ours; unnamed, the root of a config with
     // projects runs nothing itself (a project that extends it inherits `projects` too, but has a name),
     // and a config with no projects is the one project there is
-    if (typeof name === "string" ? !projects!.includes(name) : !!userConfig.test?.projects) return {};
+    if (
+      typeof name === "string"
+        ? !projects!.includes(name)
+        : !!userConfig.test?.projects
+    )
+      return {};
     // every component with a snippet is collected — an example is a test of mounting — and one the
     // plugin cannot generate still counts, so that its error fails the run instead of hiding it
     const files = scan
@@ -340,7 +350,7 @@ function sweaterVest({
 import type {
   Expect,
   Invoke,
-} from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+} from "../../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 
 declare namespace collectorFor {
   /** one import per generated test, relative to the component, behind Vitest's guard */

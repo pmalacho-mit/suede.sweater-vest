@@ -11,7 +11,11 @@ import {
 } from "./vite-plugin/analyze.ts";
 import { generate } from "./vite-plugin/generate.ts";
 import { scrub } from "./vite-plugin/scrub.ts";
-import { collectorFor, componentsFile, runtimeFile } from "./vite-plugin/plugin.ts";
+import {
+  collectorFor,
+  componentsFile,
+  runtimeFile,
+} from "./vite-plugin/plugin.ts";
 import { generatedId, posix, testName } from "./vite-plugin/names.ts";
 import { SUFFIX, extract, extracted, tempPathFor } from "./extract.ts";
 import { document, markdownForComponent, markdownOf } from "./document.ts";
@@ -20,7 +24,7 @@ import type {
   Expect,
   Invoke,
   Table,
-} from "../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+} from "../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 
 const DESCRIPTION = [
   "Print a component's test snippet as a standalone test component.",
@@ -56,7 +60,11 @@ const parse = (argv: string[]) => {
       "Print the snippets as documentation: the usage, then what verifies it. A directory documents every component under it.",
       false,
     ),
-    cli.flag(["header-level", "h"], "The heading level of a component in the Markdown; its snippets sit one below.", 2),
+    cli.flag(
+      ["header-level", "h"],
+      "The heading level of a component in the Markdown; its snippets sit one below.",
+      2,
+    ),
     cli.flag(
       "tsconfig",
       "The tsconfig file name, found upward from the working directory.",
@@ -242,22 +250,41 @@ async function writeExtracted(
   return `${shown(target)}\n`;
 }
 
-async function printMarkdown(target: string, snippet: string | undefined, level: number, tsconfig: string) {
+async function printMarkdown(
+  target: string,
+  snippet: string | undefined,
+  level: number,
+  tsconfig: string,
+) {
   const { pocketValues } = await import("./vite-plugin/pocket-values.ts");
   const values = pocketValues(process.cwd(), tsconfig);
   const root = path.resolve(target);
-  const components = fs.statSync(root).isDirectory() ? [...componentsUnder(root)] : [root];
+  const components = fs.statSync(root).isDirectory()
+    ? [...componentsUnder(root)]
+    : [root];
   const sections: string[] = [];
   for (const file of components) {
     const analysis = analyze(file, fs.readFileSync(file, "utf8"));
-    const snippets = analysis.snippets.filter((s) => isGeneratable(s) && (!snippet || s.name === snippet));
-    if (snippet && !snippets.length) throw new Error(`no test snippet named ${snippet} in ${shown(file)}`);
+    const snippets = analysis.snippets.filter(
+      (s) => isGeneratable(s) && (!snippet || s.name === snippet),
+    );
+    if (snippet && !snippets.length)
+      throw new Error(`no test snippet named ${snippet} in ${shown(file)}`);
     const docs = snippets.map((s) => {
-      const pockets = new Map([...values.forSnippet(analysis, s)].map(([name, value]) => [name, value.members]));
+      const pockets = new Map(
+        [...values.forSnippet(analysis, s)].map(([name, value]) => [
+          name,
+          value.members,
+        ]),
+      );
       return document(analysis, s, { components: componentsFile, pockets });
     });
     if (!docs.length) continue;
-    sections.push(snippet ? markdownOf(docs[0]!, level) : markdownForComponent(analysis, docs, level));
+    sections.push(
+      snippet
+        ? markdownOf(docs[0]!, level)
+        : markdownForComponent(analysis, docs, level),
+    );
   }
   return `${sections.join("\n")}`;
 }
@@ -266,8 +293,18 @@ async function printMarkdown(target: string, snippet: string | undefined, level:
 function* componentsUnder(dir: string): Generator<string> {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const at = path.join(dir, entry.name);
-    if (entry.isDirectory() && !entry.name.startsWith(".") && !SKIPPED.has(entry.name)) yield* componentsUnder(at);
-    else if (entry.isFile() && entry.name.endsWith(".svelte") && !entry.name.endsWith(".vest.svelte") && !entry.name.endsWith(SUFFIX))
+    if (
+      entry.isDirectory() &&
+      !entry.name.startsWith(".") &&
+      !SKIPPED.has(entry.name)
+    )
+      yield* componentsUnder(at);
+    else if (
+      entry.isFile() &&
+      entry.name.endsWith(".svelte") &&
+      !entry.name.endsWith(".vest.svelte") &&
+      !entry.name.endsWith(SUFFIX)
+    )
       if (fs.readFileSync(at, "utf8").includes("import.meta.vitest")) yield at;
   }
 }
@@ -280,16 +317,29 @@ const printCollector = (analysis: Analysis) => {
     .code;
 };
 
-async function run({ file, snippet, mode, tsconfig, force, help, headerLevel }: Parsed) {
+async function run({
+  file,
+  snippet,
+  mode,
+  tsconfig,
+  force,
+  help,
+  headerLevel,
+}: Parsed) {
   if (mode === "clean") return cleanExtracted(path.resolve(file ?? "."), force);
-  if (mode === "markdown" && file) return void process.stdout.write(await printMarkdown(file, snippet, headerLevel, tsconfig));
+  if (mode === "markdown" && file)
+    return void process.stdout.write(
+      await printMarkdown(file, snippet, headerLevel, tsconfig),
+    );
   if (!file || ((mode === "test" || mode === "extract") && !snippet)) {
     console.error(help());
     process.exit(2);
   }
   const analysis = loaded(file);
   for (const w of analysis.warnings)
-    console.error(`${shown(analysis.file)}:${w.line + 1}:${w.column + 1} ${w.severity}: ${w.message}`);
+    console.error(
+      `${shown(analysis.file)}:${w.line + 1}:${w.column + 1} ${w.severity}: ${w.message}`,
+    );
   const text =
     mode === "list"
       ? `${JSON.stringify(listing(analysis), null, 2)}\n`

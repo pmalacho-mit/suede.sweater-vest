@@ -1,12 +1,13 @@
 {
-  "name": "sweater-vest-suede",
+  "name": "sweater-vest",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "workspaces": [
     "release",
     "release/vscode-extension",
-    "sweater-vest-suede.typescript-namespace-tests-suede"
+    "suede.nests.sweater-vest",
+    "suede.nests.sweater-vest/vscode-extension"
   ],
   "scripts": {
     "dev": "vite dev",

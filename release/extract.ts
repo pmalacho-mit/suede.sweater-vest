@@ -5,7 +5,7 @@ import type {
   Expect,
   Invoke,
   Table,
-} from "../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+} from "../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 
 export {
   EXTRACTED_SUFFIX as SUFFIX,

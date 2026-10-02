@@ -5,20 +5,20 @@ import {
   lowerExpr,
   printExpr,
   some,
-} from "../../sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/emit/index.mts";
-import { literalOfType } from "../../sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/emit/model.mts";
-import { configFor } from "../../sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/minimal.mts";
+} from "../../suede.nests.sweater-vest/vite-plugin/emit/index.mts";
+import { literalOfType } from "../../suede.nests.sweater-vest/vite-plugin/emit/model.mts";
+import { configFor } from "../../suede.nests.sweater-vest/vite-plugin/minimal.mts";
 
 import type {
   EmitContext,
   Expr,
-} from "../../sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/emit/index.mts";
+} from "../../suede.nests.sweater-vest/vite-plugin/emit/index.mts";
 import type { Analysis, TestSnippet } from "./analyze.ts";
 import type { PocketValue } from "./generate.ts";
 import type {
   Expect,
   Invoke,
-} from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+} from "../../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 
 /**
  * A pocket's initial value is read off its type: `{ count: 2; el: HTMLDivElement }`
@@ -190,7 +190,10 @@ export function pocketValues(cwd: string, tsconfig: string) {
         const object = lowerObject(cx, type);
         values.set(p.name, {
           initial: printExpr(object),
-          members: object.kind === "object" ? object.entries.map(([k, v]) => [k, printExpr(v)]) : [],
+          members:
+            object.kind === "object"
+              ? object.entries.map(([k, v]) => [k, printExpr(v)])
+              : [],
           imports: cx.test.imports,
         });
       }

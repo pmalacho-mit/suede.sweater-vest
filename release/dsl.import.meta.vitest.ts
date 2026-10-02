@@ -11,7 +11,7 @@ export type {
 
 // `Widen<2>` is `number` to the type checker and `2` to the pocket's initial
 // value: write it for a member the body will assign to.
-export type { Widen } from "../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+export type { Widen } from "../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 
 // Components for writing and showing tests, as a type-only namespace: a snippet
 // takes one as `Status: typeof Sweater.Status`, and the generated test imports it.
