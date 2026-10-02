@@ -281,7 +281,7 @@ export const markdownOf = (doc: Documented, level: number): string =>
 export const markdownForComponent = (analysis: Analysis, docs: Documented[], level: number): string =>
   [`${"#".repeat(level)} ${stemOf(analysis.file)}`, "", ...docs.map((d) => markdownOf(d, level + 1))].join("\n");
 
-import type { Expect, Invoke } from "./vendored/typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+import type { Expect, Invoke } from "../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
 import type { markdownFor, usageOf, verifiedByOf } from "./_internal/harness.ts";
 
 declare namespace document {

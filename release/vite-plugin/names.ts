@@ -35,7 +35,7 @@ export const importPath = (importer: string, file: string) => {
   return rel.startsWith(".") ? rel : `./${rel}`;
 };
 
-import type { Expect, Invoke, Table } from "../vendored/typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+import type { Expect, Invoke, Table } from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
 
 declare namespace generatedId {
   /** beside the component, named for the component and the snippet */

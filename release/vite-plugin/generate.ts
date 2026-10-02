@@ -137,7 +137,7 @@ export function generate(analysis: Analysis, snippet: TestSnippet, options: Gene
   return { code, map };
 }
 
-import type { Expect, Invoke } from "../vendored/typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+import type { Expect, Invoke } from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
 import type { generated, generatedWhole } from "../_internal/harness.ts";
 
 declare namespace generate {

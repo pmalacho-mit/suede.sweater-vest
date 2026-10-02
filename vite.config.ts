@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { sveltekit } from "@sveltejs/kit/vite";
 import sweaterVest from "./release/vite-plugin/plugin.ts";
-import namespaceTests from "./release/vendored/typescript-namespace-tests-suede/vite-plugin/plugin.mts";
+import namespaceTests from "./sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/plugin.mts";
 
 export default defineConfig({
   plugins: [

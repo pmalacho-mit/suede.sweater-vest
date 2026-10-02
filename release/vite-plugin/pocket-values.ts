@@ -5,20 +5,20 @@ import {
   lowerExpr,
   printExpr,
   some,
-} from "../vendored/typescript-namespace-tests-suede/vite-plugin/emit/index.mts";
-import { literalOfType } from "../vendored/typescript-namespace-tests-suede/vite-plugin/emit/model.mts";
-import { configFor } from "../vendored/typescript-namespace-tests-suede/vite-plugin/minimal.mts";
+} from "../../sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/emit/index.mts";
+import { literalOfType } from "../../sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/emit/model.mts";
+import { configFor } from "../../sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/minimal.mts";
 
 import type {
   EmitContext,
   Expr,
-} from "../vendored/typescript-namespace-tests-suede/vite-plugin/emit/index.mts";
+} from "../../sweater-vest-suede.typescript-namespace-tests-suede/vite-plugin/emit/index.mts";
 import type { Analysis, TestSnippet } from "./analyze.ts";
 import type { PocketValue } from "./generate.ts";
 import type {
   Expect,
   Invoke,
-} from "../vendored/typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+} from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
 
 /**
  * A pocket's initial value is read off its type: `{ count: 2; el: HTMLDivElement }`

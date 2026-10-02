@@ -332,7 +332,7 @@ export default function sweaterVest({
 import type {
   Expect,
   Invoke,
-} from "../vendored/typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+} from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
 
 declare namespace collectorFor {
   /** one import per generated test, relative to the component, behind Vitest's guard */

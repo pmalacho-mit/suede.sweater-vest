@@ -4,8 +4,6 @@
   "type": "module",
   "description": "Svelte component tests written as snippets beside the components they test, run by Vitest and erased from builds.",
   "workspaces": [
-    "vendored/typescript-namespace-tests-suede",
-    "vendored/typescript-namespace-tests-suede/vscode-extension",
     "vscode-extension"
   ],
   "scripts": {
@@ -13,7 +11,7 @@
     "clean-extracted": "node cli.ts --clean-extracted",
     "build-extension": "npm --prefix vscode-extension run build",
     "install-extension": "npm --prefix vscode-extension run install-extension",
-    "install-typescript-extension": "npm --prefix vendored/typescript-namespace-tests-suede/vscode-extension run install-extension",
+    "install-typescript-extension": "npm --prefix ../sweater-vest-suede.typescript-namespace-tests-suede/vscode-extension run install-extension",
     "install-extensions": "npm run install-extension && npm run install-typescript-extension"
   },
   "devDependencies": {

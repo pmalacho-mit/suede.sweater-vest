@@ -20,7 +20,7 @@ import type {
   Expect,
   Invoke,
   Table,
-} from "./vendored/typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+} from "../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
 
 const DESCRIPTION = [
   "Print a component's test snippet as a standalone test component.",

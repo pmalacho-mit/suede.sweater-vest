@@ -6,8 +6,7 @@
   "workspaces": [
     "release",
     "release/vscode-extension",
-    "release/vendored/typescript-namespace-tests-suede",
-    "release/vendored/typescript-namespace-tests-suede/vscode-extension"
+    "sweater-vest-suede.typescript-namespace-tests-suede"
   ],
   "scripts": {
     "dev": "vite dev",

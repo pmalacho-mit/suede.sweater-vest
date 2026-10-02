@@ -418,7 +418,7 @@ export const isGeneratable = (snippet: TestSnippet) =>
 
 export const hasTest = (snippet: TestSnippet) => snippet.params.some((p) => p.kind === "test");
 
-import type { Expect, Invoke, Table } from "../vendored/typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+import type { Expect, Invoke, Table } from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
 import type { errorsOf, lineOf, paramsOf, snippetNames, warningsOf } from "../_internal/harness.ts";
 
 declare namespace analyze {
