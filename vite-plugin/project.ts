@@ -66,7 +66,7 @@ export const project = <
 import type {
   Expect,
   Invoke,
-} from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+} from "../../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 
 declare namespace project {
   /** with nothing given: the default name, jsdom, and only what the plugin collects */

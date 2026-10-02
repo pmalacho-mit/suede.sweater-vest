@@ -1,5 +1,10 @@
 import path from "node:path";
-import { hasTest, type Analysis, type Import, type TestSnippet } from "./analyze.ts";
+import {
+  hasTest,
+  type Analysis,
+  type Import,
+  type TestSnippet,
+} from "./analyze.ts";
 import { generatedId, importPath, testName } from "./names.ts";
 import { generatedSourceMap } from "./sourcemap.ts";
 
@@ -36,18 +41,26 @@ function printImport(i: Import, values: Set<string>): string {
   for (const b of i.bindings) {
     const asType = b.typeOnly && !values.has(b.local);
     if (b.kind === "namespace") {
-      lines.push(`import ${asType ? "type " : ""}* as ${b.local} from ${spec};`);
+      lines.push(
+        `import ${asType ? "type " : ""}* as ${b.local} from ${spec};`,
+      );
     } else if (b.kind === "default") {
       if (asType) typeDefault = b.local;
       else valueDefault = b.local;
     } else {
-      const text = b.imported === b.local ? b.local : `${b.imported} as ${b.local}`;
+      const text =
+        b.imported === b.local ? b.local : `${b.imported} as ${b.local}`;
       (asType ? typeNamed : valueNamed).push(text);
     }
   }
   const line = (type: boolean, def: string | null, named: string[]) => {
-    const parts = [def, named.length ? `{ ${named.join(", ")} }` : null].filter(Boolean);
-    if (parts.length) lines.push(`import ${type ? "type " : ""}${parts.join(", ")} from ${spec};`);
+    const parts = [def, named.length ? `{ ${named.join(", ")} }` : null].filter(
+      Boolean,
+    );
+    if (parts.length)
+      lines.push(
+        `import ${type ? "type " : ""}${parts.join(", ")} from ${spec};`,
+      );
   };
   line(true, typeDefault, typeNamed);
   line(false, valueDefault, valueNamed);
@@ -61,7 +74,11 @@ const indent = (text: string, by = "  ") =>
     .join("\n");
 
 /** The generated test component for one snippet, with a map back to the component. */
-export function generate(analysis: Analysis, snippet: TestSnippet, options: GenerateOptions) {
+export function generate(
+  analysis: Analysis,
+  snippet: TestSnippet,
+  options: GenerateOptions,
+) {
   const { file, source } = analysis;
   const id = options.at ?? generatedId(file, snippet.name);
   const runtime = importPath(id, options.runtime);
@@ -82,7 +99,10 @@ export function generate(analysis: Analysis, snippet: TestSnippet, options: Gene
       const value = options.pockets.get(p.name);
       args.push(`__pocket<${p.typeText}>(${value?.initial ?? "{}"})`);
       for (const [specifier, bindings] of value?.imports ?? [])
-        extraImports.set(specifier, new Set([...(extraImports.get(specifier) ?? []), ...bindings]));
+        extraImports.set(
+          specifier,
+          new Set([...(extraImports.get(specifier) ?? []), ...bindings]),
+        );
     } else if (p.kind === "sweater") {
       sweater = true;
       args.push(`__Sweater.${p.member}`);
@@ -90,9 +110,13 @@ export function generate(analysis: Analysis, snippet: TestSnippet, options: Gene
     else args.push("undefined");
   }
 
-  const imports = analysis.imports.map((i) => printImport(i, values)).filter(Boolean);
+  const imports = analysis.imports
+    .map((i) => printImport(i, values))
+    .filter(Boolean);
   for (const [specifier, bindings] of extraImports)
-    imports.push(`import { ${[...bindings].join(", ")} } from ${quote(specifier)};`);
+    imports.push(
+      `import { ${[...bindings].join(", ")} } from ${quote(specifier)};`,
+    );
 
   const meta = {
     name: testName(file, snippet.name),
@@ -117,7 +141,11 @@ export function generate(analysis: Analysis, snippet: TestSnippet, options: Gene
     ``,
     `<script${langAttr}>`,
     `  import { pocket as __pocket, type Harness as __Harness } from ${quote(runtime)};`,
-    ...(sweater ? [`  import * as __Sweater from ${quote(importPath(id, options.components))};`] : []),
+    ...(sweater
+      ? [
+          `  import * as __Sweater from ${quote(importPath(id, options.components))};`,
+        ]
+      : []),
     indent(imports.join("\n")),
     ``,
     `  let { harness: __harness }: { harness: __Harness } = $props();`,
@@ -125,19 +153,39 @@ export function generate(analysis: Analysis, snippet: TestSnippet, options: Gene
     ``,
   ];
   // the snippet was written under the component's styles, so it keeps them; what it does not use is no mistake
-  const css = analysis.css ? [``, `<!-- svelte-ignore css_unused_selector -->`, source.slice(analysis.css.start, analysis.css.end)] : [];
-  const lines = [...head, source.slice(snippet.start, snippet.end), ``, `{@render ${snippet.name}(${args.join(", ")})}`, ...css, ``];
+  const css = analysis.css
+    ? [
+        ``,
+        `<!-- svelte-ignore css_unused_selector -->`,
+        source.slice(analysis.css.start, analysis.css.end),
+      ]
+    : [];
+  const lines = [
+    ...head,
+    source.slice(snippet.start, snippet.end),
+    ``,
+    `{@render ${snippet.name}(${args.join(", ")})}`,
+    ...css,
+    ``,
+  ];
   const code = lines.join("\n");
   const map = generatedSourceMap(
     id,
     code,
     { file, text: source },
-    { generatedLine: head.join("\n").split("\n").length, sourceStart: snippet.start, sourceEnd: snippet.end },
+    {
+      generatedLine: head.join("\n").split("\n").length,
+      sourceStart: snippet.start,
+      sourceEnd: snippet.end,
+    },
   );
   return { code, map };
 }
 
-import type { Expect, Invoke } from "../../sweater-vest-suede.typescript-namespace-tests-suede/dsl.import.meta.vitest.ts";
+import type {
+  Expect,
+  Invoke,
+} from "../../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 import type { generated, generatedWhole } from "../_internal/harness.ts";
 
 declare namespace generate {
@@ -148,16 +196,31 @@ declare namespace generate {
 {/snippet}
 `;
 
-  type Code = Invoke<typeof generated, [Markup, "simple", { pocket: "{ n: 2 }" }]>;
+  type Code = Invoke<
+    typeof generated,
+    [Markup, "simple", { pocket: "{ n: 2 }" }]
+  >;
 
   /** the component's own type import becomes a value import, under the same name */
-  export type SelfAsValue = Expect<Code, "includes", 'import Self from "./Probe.svelte";'>;
+  export type SelfAsValue = Expect<
+    Code,
+    "includes",
+    'import Self from "./Probe.svelte";'
+  >;
 
   /** the DSL stays a type import */
-  export type DslStaysType = Expect<Code, "includes", 'import type { Test, Widen, Sweater } from "../lib/dsl.import.meta.vitest";'>;
+  export type DslStaysType = Expect<
+    Code,
+    "includes",
+    'import type { Test, Widen, Sweater } from "../lib/dsl.import.meta.vitest";'
+  >;
 
   /** the snippet is copied as written */
-  export type Verbatim = Expect<Code, "includes", "<C bind:this={pocket.el} />">;
+  export type Verbatim = Expect<
+    Code,
+    "includes",
+    "<C bind:this={pocket.el} />"
+  >;
 
   /** and rendered with the component, its pocket, and the harness's test */
   export type Rendered = Expect<
@@ -192,7 +255,11 @@ import type * as ns from "./ns.ts";
     Expect<ValueCode, "includes", 'import type { Shape } from "./harness.ts";'>,
     Expect<ValueCode, "includes", 'import { fakeData } from "./harness.ts";'>,
     Expect<ValueCode, "includes", 'import type * as ns from "./ns.ts";'>,
-    Expect<ValueCode, "includes", "{@render v(Self, fakeData, __harness.test)}">,
+    Expect<
+      ValueCode,
+      "includes",
+      "{@render v(Self, fakeData, __harness.test)}"
+    >,
   ];
 }
 
@@ -209,8 +276,16 @@ declare namespace generate {
 
   /** a library component comes from the components index, under the namespace the snippet wrote */
   export type Components = [
-    Expect<StatusCode, "includes", 'import * as __Sweater from "../lib/components/index.ts";'>,
-    Expect<StatusCode, "includes", "{@render shown(Self, __Sweater.Status, __harness.test)}">,
+    Expect<
+      StatusCode,
+      "includes",
+      'import * as __Sweater from "../lib/components/index.ts";'
+    >,
+    Expect<
+      StatusCode,
+      "includes",
+      "{@render shown(Self, __Sweater.Status, __harness.test)}"
+    >,
   ];
 
   type Styled = `<script lang="ts">
