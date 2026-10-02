@@ -16,6 +16,9 @@ out before the compiler sees them.
   let { count = 0 }: { count?: number } = $props();
 </script>
 
+<p>{count}</p>
+
+<<!-- BEGIN SWEATER VEST TEST -->
 {#snippet counts(
   Counter: typeof Self,
   pocket: { count: Widen<2>; el: HTMLDivElement },
@@ -33,7 +36,6 @@ out before the compiler sees them.
   })}
 {/snippet}
 
-<p>{count}</p>
 ```
 
 The snippet is never rendered by the component, so the type checker reads it as
@@ -43,7 +45,7 @@ renders on a page of its own.
 
 ## Setup
 
-Add the plugin to your Vite config, and give Vitest a jsdom project for it:
+Add the plugin to your Vite config, and its project to Vitest's:
 
 ```ts
 // vite.config.ts
@@ -52,18 +54,37 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import sweaterVest from "<path>/sweater-vest-suede/vite-plugin/plugin.ts";
 
 export default defineConfig({
-  plugins: [sveltekit(), sweaterVest({ project: "sweater" })],
+  plugins: [sveltekit(), sweaterVest()],
   test: {
     projects: [
-      {
-        extends: true,
-        resolve: { conditions: ["browser"] },
-        test: { name: "sweater", environment: "jsdom", include: [] },
-      },
+      sweaterVest.project(),
+      // your other projects, as they were
     ],
   },
 });
 ```
+
+`sweaterVest.project()` is the project snippet tests run in, typed as exactly
+what it returns:
+
+```ts
+{ extends: true; resolve: { conditions: ["browser"] }; test: { name: "sweater-vest"; environment: "jsdom"; include: [] } }
+```
+
+Every part is needed: `extends: true` inherits your config and the plugin with
+it, the `browser` condition gives Svelte its client build, and `include: []`
+because the plugin collects components itself. What may vary is an option:
+
+```ts
+sweaterVest.project({
+  name: "dom",                          // then also sweaterVest({ project: "dom" })
+  environment: "happy-dom",             // default "jsdom"
+  test: { setupFiles: ["./setup.ts"] }, // anything else for this project's `test`
+});
+```
+
+Without `projects` at all, the plugin collects in your one config; give it
+`environment: "jsdom"` and `resolve: { conditions: ["browser"] }` yourself.
 
 Installing with suede adds the packages the library needs to your
 `package.json` (see [package.json](./package.json)): among them
@@ -208,11 +229,11 @@ own around a snippet:
 <p>{test.name}: {test.state}{#if test.error}, {test.error}{/if}</p>
 ```
 
-| Member       | What it is                                 |
-| ------------ | ------------------------------------------ |
-| `test.name`  | `Counter > counts`                         |
-| `test.state` | `"running"`, then `"passed"` or `"failed"` |
-| `test.error` | the failure's message, once it has failed  |
+| Member       | What it is                                     |
+| ------------ | ---------------------------------------------- |
+| `test.name`  | `Counter > counts`                             |
+| `test.state` | `"running"`, then `"passed"` or `"failed"`     |
+| `test.error` | the failure's message, once it has failed      |
 | `test.notes` | every `note` the body wrote so far, reactively |
 
 ## What works, and where the seams are

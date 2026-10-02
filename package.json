@@ -39,5 +39,10 @@
     "jsdom": {
       "optional": true
     }
+  },
+  "imports": {
+    "#namespace-tests/*": {
+      "default": "../sweater-vest-suede.typescript-namespace-tests-suede/*"
+    }
   }
 }
