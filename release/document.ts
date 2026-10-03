@@ -190,7 +190,7 @@ function testCall(
 }
 
 // a node that is there to show the test — an element given `test`, a tag reading it — is not usage
-function* testDisplay(body: Node[], test: string): Generator<Node> {
+function* testDisplay(body: Node[], test: string, subject: string): Generator<Node> {
   for (const node of body) {
     if (
       node.type === "ExpressionTag" ||
@@ -201,7 +201,8 @@ function* testDisplay(body: Node[], test: string): Generator<Node> {
       continue;
     }
     const attributes = (node.attributes as Node[] | undefined) ?? [];
-    if (attributes.some((a) => refers(a, test))) {
+    // the subject given `test` is usage itself
+    if (node.name !== subject && attributes.some((a) => refers(a, test))) {
       yield node;
       continue;
     }
@@ -215,7 +216,7 @@ function* testDisplay(body: Node[], test: string): Generator<Node> {
       shown.every((c) => c.type !== "Text" && refers(c, test))
     )
       yield node;
-    else yield* testDisplay(children, test);
+    else yield* testDisplay(children, test, subject);
   }
 }
 
@@ -312,7 +313,7 @@ export function document(
 
   // the test, and what only shows it, leave the usage: nothing in them counts
   const call = test ? testCall(body, test) : null;
-  const removed = new Set<Node>(test ? testDisplay(body, test) : []);
+  const removed = new Set<Node>(test ? testDisplay(body, test, subject.name) : []);
   if (call) removed.add(call.tag);
 
   // what the usage keeps: everything the markup reads, and what the pockets' types name
@@ -379,6 +380,9 @@ export function document(
     `import ${subject.name} from ${quote(`./${path.basename(file)}`)};`,
   ];
   for (const p of snippet.params) if (p.kind === "value") asValue.set(p.local, p.name);
+  // the subject still given the test: the usage is handed it too
+  const dsl = test && keep.has(test) ? analysis.imports.find((i) => isDslModule(i.specifier)) : undefined;
+  if (dsl) lines.push(`import type { Test } from ${quote(dsl.specifier)};`);
   for (const i of analysis.imports) {
     // the DSL names nothing a reader writes, and the component's own type import is now the component
     if (
@@ -402,7 +406,7 @@ export function document(
       `import { ${sweaters.map((p) => (p.kind === "sweater" ? (p.member === p.name ? p.name : `${p.member} as ${p.name}`) : "")).join(", ")} } from ${quote(spec)};`,
     );
   }
-  const state: string[] = [];
+  const state: string[] = dsl ? [`let { ${test} }: { ${test}: Test } = $props();`] : [];
   for (const p of pockets) {
     if (p.kind !== "pocket") continue;
     const values = new Map(options.pockets.get(p.name) ?? []);
@@ -666,5 +670,19 @@ declare namespace document {
     Invoke<typeof usageOf, [Hoist, "hoist", { pocket: { n: "1" } }]>,
     "includes",
     'let n = $state(1);\n  const twice = $derived(n * 2);\n  const label = "n";\n</script>\n\n<C n={twice} {label} />'
+  >;
+
+  type Given = `
+{#snippet given(C: typeof Self, test: Test)}
+  <C {test} />
+  {test(async () => {})}
+{/snippet}
+`;
+
+  /** the subject given the test stays, and the usage is handed the test */
+  export type Subject = Expect<
+    Invoke<typeof usageOf, [Given, "given"]>,
+    "=",
+    '<script lang="ts">\n  import C from "./Probe.svelte";\n  import type { Test } from "../lib/dsl.import.meta.vitest";\n\n  let { test }: { test: Test } = $props();\n</script>\n\n<C {test} />\n'
   >;
 }
