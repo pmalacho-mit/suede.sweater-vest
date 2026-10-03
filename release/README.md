@@ -413,7 +413,7 @@ test — "Verified by" with the body of its test:
   import Counter from "./Counter.svelte";
 
   let count = $state(2);
-  let el: HTMLDivElement;
+  let el = $state<HTMLDivElement>();
 </script>
 
 <div bind:this={el}>

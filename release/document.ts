@@ -220,7 +220,7 @@ function* testDisplay(body: Node[], test: string, subject: string): Generator<No
   }
 }
 
-// the members of a pocket's type, as written: name, type text, optional
+// the members of a pocket's type, as written: name, type text
 const membersOf = (typeText: string) => {
   const sf = ts.createSourceFile(
     "p.ts",
@@ -236,7 +236,6 @@ const membersOf = (typeText: string) => {
           {
             name: m.name.getText(sf),
             type: m.type.getText(sf),
-            optional: !!m.questionToken,
           },
         ]
       : [],
@@ -435,10 +434,7 @@ export function document(
     for (const m of members) {
       const value = values.get(m.name);
       if (value !== undefined) state.push(`let ${m.name} = $state(${value});`);
-      else
-        state.push(
-          `let ${m.name}: ${m.type}${m.optional ? " | undefined" : ""};`,
-        );
+      else state.push(`let ${m.name} = $state<${m.type}>();`);
     }
   }
   state.push(...hoisted);
@@ -522,7 +518,7 @@ declare namespace document {
     Expect<
       Usage,
       "startsWith",
-      '<script lang="ts">\n  import Counter from "./Probe.svelte";\n\n  let count = $state(5);\n  let el: HTMLDivElement;\n</script>'
+      '<script lang="ts">\n  import Counter from "./Probe.svelte";\n\n  let count = $state(5);\n  let el = $state<HTMLDivElement>();\n</script>'
     >,
     Expect<Usage, "includes", "<Counter bind:count={count} step={2} />">,
     Expect<Usage, "excludes", "dsl.import.meta.vitest">,
@@ -611,7 +607,7 @@ declare namespace document {
     Expect<
       Invoke<typeof usageOf, [Cast, "cast", { pocket: { n: "1" } }]>,
       "includes",
-      "let el: HTMLDivElement;\n  let n = $state(1);\n</script>\n\n<div bind:this={el}><C n={n!} /></div>"
+      "let el = $state<HTMLDivElement>();\n  let n = $state(1);\n</script>\n\n<div bind:this={el}><C n={n!} /></div>"
     >,
   ];
 
