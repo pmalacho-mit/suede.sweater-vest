@@ -355,6 +355,18 @@ export function document(
     : null;
   for (const shown of removed) s.remove(shown.start!, shown.end!);
 
+  // a top-level `{@const}` is only valid in a block: it moves to the script, derived when it reads a pocket
+  const hoisted: string[] = [];
+  for (const c of body.filter((n) => n.type === "ConstTag")) {
+    const d = c.declaration as Node;
+    const init = (d.declarations as Node[])[0]!.init as Node;
+    const value = s.slice(init.start!, init.end!);
+    hoisted.push(
+      `${s.slice(d.start!, init.start!)}${pockets.some((p) => refers(init, p.name)) ? `$derived(${value})` : value};`,
+    );
+    s.remove(c.start!, c.end! + source.slice(c.end!).match(/^\s*/)![0].length);
+  }
+
   const first = body[0]!.start!;
   const last = body[body.length - 1]!.end!;
   const markup = dedent(s.slice(first, last));
@@ -425,6 +437,7 @@ export function document(
         );
     }
   }
+  state.push(...hoisted);
   const styled = classesStyled(source);
   const css =
     analysis.css && [...classesIn(node)].some((c) => styled.has(c))
@@ -637,5 +650,21 @@ declare namespace document {
     >,
     "startsWith",
     '<script lang="ts">\n  import C from "./Probe.svelte";\n  import { createThing as make, type Thing } from "./thing.ts";\n  import Box from "./Frame.svelte";\n</script>'
+  >;
+
+  type Hoist = `
+{#snippet hoist(C: typeof Self, pocket: { n: Widen<1> }, test: Test)}
+  {@const twice = pocket.n * 2}
+  {@const label = "n"}
+  <C n={twice} {label} />
+  {test(async () => {})}
+{/snippet}
+`;
+
+  /** a top-level `{@const}` moves to the script, after the state, derived when it reads the pocket */
+  export type Hoisted = Expect<
+    Invoke<typeof usageOf, [Hoist, "hoist", { pocket: { n: "1" } }]>,
+    "includes",
+    'let n = $state(1);\n  const twice = $derived(n * 2);\n  const label = "n";\n</script>\n\n<C n={twice} {label} />'
   >;
 }
