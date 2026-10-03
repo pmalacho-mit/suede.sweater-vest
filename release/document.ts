@@ -222,7 +222,7 @@ function* testDisplay(body: Node[], test: string, subject: string): Generator<No
   }
 }
 
-// the members of a pocket's type, as written: name, type text
+// the members of a pocket's type, as written: name, type text, optional
 const membersOf = (typeText: string) => {
   const sf = ts.createSourceFile(
     "p.ts",
@@ -238,6 +238,7 @@ const membersOf = (typeText: string) => {
           {
             name: m.name.getText(sf),
             type: m.type.getText(sf),
+            optional: !!m.questionToken,
           },
         ]
       : [],
