@@ -437,7 +437,8 @@ import under the name the snippet gave it; a pocket becomes `$state` locals
 (`pocket.count` reads `count` throughout) unless the snippet also hands the
 pocket around whole, in which case it stays an object; `typeof` imports and
 `Sweater` components become real imports; `{test(…)}` and markup that only
-shows the test (`<Status {test} />`, `{test.state}`) leave the usage; a top-level
+shows the test (`<Status {test} />`, `{test.state}`) leave the usage, but the component
+itself given `test` stays and the usage takes `test` as a prop; a top-level
 `{@const}` moves into the script, `$derived` when it reads the test or the pocket; the
 component's `<style>` comes along only if the markup uses a class from it;
 and every import nothing refers to is dropped, the DSL's first. An example

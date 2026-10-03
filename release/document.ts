@@ -215,7 +215,7 @@ function* testDisplay(body: Node[], test: string, subject: string): Generator<No
     );
     if (
       shown.length &&
-      shown.every((c) => c.type !== "Text" && refers(c, test))
+      shown.every((c) => c.type !== "Text" && refers(c, test) && !uses([c], subject, new Set()))
     )
       yield node;
     else yield* testDisplay(children, test, subject);
@@ -682,16 +682,16 @@ declare namespace document {
 
   type Given = `
 {#snippet given(C: typeof Self, test: Test)}
-  <C {test} />
+  <div><C {test} /></div>
   {test(async () => {})}
 {/snippet}
 `;
 
-  /** the subject given the test stays, and the usage is handed the test */
+  /** the subject given the test stays, wrapped or not, and the usage is handed the test */
   export type Subject = Expect<
     Invoke<typeof usageOf, [Given, "given"]>,
     "=",
-    '<script lang="ts">\n  import C from "./Probe.svelte";\n  import type { Test } from "../lib/dsl.import.meta.vitest";\n\n  let { test }: { test: Test } = $props();\n</script>\n\n<C {test} />\n'
+    '<script lang="ts">\n  import C from "./Probe.svelte";\n  import type { Test } from "../lib/dsl.import.meta.vitest";\n\n  let { test }: { test: Test } = $props();\n</script>\n\n<div><C {test} /></div>\n'
   >;
 
   type Described = `
