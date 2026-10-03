@@ -140,6 +140,8 @@ const namesIn = (node: Node, skip: Set<Node>, into = new Set<string>()) => {
   for (const [n, parent, key] of walk(node, null, "", true, skip))
     if (n.type === "Identifier" && isReference(n, parent, key))
       into.add(n.name as string);
+    // a component tag names its root too
+    else if (n.type === "Component") into.add((n.name as string).split(".")[0]!);
   return into;
 };
 
@@ -268,24 +270,26 @@ const quote = (s: string) => JSON.stringify(s);
 const printImport = (
   i: Import,
   keep: Set<string>,
-  asValue: Set<string>,
+  asValue: Map<string, string>,
 ): string | null => {
-  const def = i.bindings.find((b) => b.kind === "default" && keep.has(b.local));
+  // a value parameter's binding is imported under the parameter's name
+  const name = (b: { local: string }) => asValue.get(b.local) ?? b.local;
+  const def = i.bindings.find((b) => b.kind === "default" && keep.has(name(b)));
   const named = i.bindings.filter(
-    (b) => b.kind === "named" && keep.has(b.local),
+    (b) => b.kind === "named" && keep.has(name(b)),
   );
   const ns = i.bindings.find(
-    (b) => b.kind === "namespace" && keep.has(b.local),
+    (b) => b.kind === "namespace" && keep.has(name(b)),
   );
   if (!def && !named.length && !ns) return null;
   const typeOnly = [def, ...named, ns]
     .filter(Boolean)
     .every((b) => b!.typeOnly && !asValue.has(b!.local));
   const parts = [
-    def?.local,
-    ns ? `* as ${ns.local}` : null,
+    def && name(def),
+    ns ? `* as ${name(ns)}` : null,
     named.length
-      ? `{ ${named.map((b) => (b.kind === "named" && b.imported !== b.local ? `${b.imported} as ${b.local}` : b.local)).join(", ")} }`
+      ? `{ ${named.map((b) => (!typeOnly && b.typeOnly && !asValue.has(b.local) ? "type " : "") + (b.kind === "named" && b.imported !== name(b) ? `${b.imported} as ${name(b)}` : name(b))).join(", ")} }`
       : null,
   ].filter(Boolean);
   return `import ${typeOnly ? "type " : ""}${parts.join(", ")} from ${quote(i.specifier)};`;
@@ -356,13 +360,13 @@ export function document(
   const markup = dedent(s.slice(first, last));
 
   // the script: imports the usage reaches, then the pocket as state
-  const asValue = new Set<string>([subject.name]);
+  const asValue = new Map<string, string>([[subject.name, subject.name]]);
   const keep = new Set<string>([...referenced]);
   keep.delete(analysis.self!);
   const lines: string[] = [
     `import ${subject.name} from ${quote(`./${path.basename(file)}`)};`,
   ];
-  for (const p of snippet.params) if (p.kind === "value") asValue.add(p.local);
+  for (const p of snippet.params) if (p.kind === "value") asValue.set(p.local, p.name);
   for (const i of analysis.imports) {
     // the DSL names nothing a reader writes, and the component's own type import is now the component
     if (
@@ -617,4 +621,21 @@ declare namespace document {
       "let pocket = $state({ grid: undefined as HTMLDivElement | undefined });\n</script>\n\n<div bind:this={pocket.grid}><C /></div>"
     >,
   ];
+
+  type Aliased = `
+{#snippet aliased(C: typeof Self, make: typeof createThing, Box: typeof Frame, test: Test)}
+  <Box><C thing={make({} as Thing)} /></Box>
+  {test(async () => {})}
+{/snippet}
+`;
+
+  /** a value parameter is imported as a value, under the snippet's name for it; a type beside it stays a type */
+  export type Renamed = Expect<
+    Invoke<
+      typeof usageOf,
+      [Aliased, "aliased", {}, 'import type { createThing, Thing } from "./thing.ts";\nimport type Frame from "./Frame.svelte";']
+    >,
+    "startsWith",
+    '<script lang="ts">\n  import C from "./Probe.svelte";\n  import { createThing as make, type Thing } from "./thing.ts";\n  import Box from "./Frame.svelte";\n</script>'
+  >;
 }
