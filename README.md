@@ -9,9 +9,13 @@ it is developed.
   each with its test snippets — Testing Library's canonical cases, forms,
   bindable props, context, transitions, dialogs, keyboard navigation, instance
   methods, shared runes state. The library's README lists them.
-- [src/lib/showcase](./src/lib/showcase): the library's own components for
-  tests (`Sweater.Status`, `Frame`, `Stage`, `Row`, `Column`, `Grid`,
-  `Labeled`, `Theme`, `Inspect`), each shown in a snippet.
+- [release/components](./release/components): the library's own components
+  for tests (`Sweater.Status`, `Frame`, `Stage`, `Row`, `Column`, `Grid`,
+  `Labeled`, `Theme`, `Inspect`), each tested and documented by snippets of
+  its own — the library bootstrapping itself. `vite.config.ts` sets
+  `_scanSelf` so this repository collects them.
+- [src/lib/showcase](./src/lib/showcase): the same components used from a
+  component of an app's own, as `typeof Sweater.<Name>`.
 - [src/routes/vests](./src/routes/vests): every snippet on a page of its own
   (`/vests`), running its test live.
 - [src/routes/examples](./src/routes/examples): the example components used as
@@ -20,7 +24,7 @@ it is developed.
 
 ```sh
 npm run dev      # the dev server, with pages at /vests and the components at /examples
-npm test         # Vitest: the examples' snippet tests (jsdom) and the library's own namespace tests
+npm test         # Vitest: the examples' and release components' snippet tests (jsdom), and the library's namespace tests
 npm run report   # with the dev server up: every snippet in a real browser → fashion-show.md
 npm run check    # svelte-check
 npm run build    # then grep .svelte-kit/output for __pocket, createDeferred, dsl.import.meta.vitest: none

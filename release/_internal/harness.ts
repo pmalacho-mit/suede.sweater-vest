@@ -140,11 +140,13 @@ export function pocketOf(name: string, snippet: string, param: string) {
   };
 }
 
+const COMPONENTS = "/project/lib/components/index.ts";
+
 /** A snippet as documentation, pocket values given by hand as `{ pocket: { member: "2" } }`. */
-export const documented = (markup: string, snippet: string, pockets: Record<string, Record<string, string>> = {}, script = "") => {
-  const analysis = analyzed(markup, script);
+export const documented = (markup: string, snippet: string, pockets: Record<string, Record<string, string>> = {}, script = "", file = FILE) => {
+  const analysis = analyzed(markup, script, file);
   return document(analysis, snippetOf(analysis, snippet), {
-    components: "/project/lib/components/index.ts",
+    components: COMPONENTS,
     pockets: new Map(Object.entries(pockets).map(([name, members]) => [name, Object.entries(members)])),
   });
 };
@@ -156,3 +158,7 @@ export const verifiedByOf = (markup: string, snippet: string, pockets: Record<st
   documented(markup, snippet, pockets).verifiedBy;
 
 export const markdownFor = (markup: string, snippet: string, level = 2): string => markdownOf(documented(markup, snippet), level);
+
+/** The usage of a probe that is itself one of the library's components: beside the components index. */
+export const usageAmongComponentsOf = (markup: string, snippet: string): string =>
+  documented(markup, snippet, {}, "", path.join(path.dirname(COMPONENTS), "Probe.svelte")).usage;

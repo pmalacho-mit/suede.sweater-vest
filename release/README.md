@@ -180,8 +180,10 @@ nothing of it reaches a build:
 | `Grid`          | a matrix of variants: `<Grid columns={3}>`                                            |
 | `Theme`         | content under `scheme="light"` or `"dark"` (`color-scheme` and `data-theme`)          |
 
-They live in [components/](./components), and `src/lib/showcase` in the
-repository shows each one in a snippet.
+They live in [components/](./components), and each carries snippets of its
+own that test it and show how it is used (`node <path>/cli.ts
+<path>/components --markdown` prints them). Vendoring the library does not add
+those tests to your suite: discovery skips the library's own folder.
 
 ### Pockets
 

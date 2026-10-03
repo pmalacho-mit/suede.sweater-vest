@@ -7,6 +7,15 @@ export default defineConfig({
   plugins: [
     sveltekit(),
     sweaterVest({
+      // the library's own components carry snippets that test and document them;
+      // its fixtures are inputs to its namespace tests, not tests of their own
+      _scanSelf: true,
+      exclude: [
+        "release/_internal/**",
+        "release/vendored/**",
+        "suede.nests/**",
+        "suede.nests.sweater-vest/**",
+      ],
       external: process.env.SWEATER_VEST_PORT
         ? `http://localhost:${process.env.SWEATER_VEST_PORT}`
         : undefined,

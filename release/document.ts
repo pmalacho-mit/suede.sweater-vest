@@ -53,6 +53,19 @@ const SKIP = new Set([
   "trailingComments",
 ]);
 
+// TypeScript nodes that wrap a run-time expression — `x as T`, `x!`, `<T>x`, `x satisfies T`,
+// `f<T>`: the expression is code, only the type beside it (itself a TS node) is not
+const TS_EXPRESSIONS = new Set([
+  "TSAsExpression",
+  "TSSatisfiesExpression",
+  "TSNonNullExpression",
+  "TSTypeAssertion",
+  "TSInstantiationExpression",
+]);
+
+const isType = (node: Node) =>
+  node.type.startsWith("TS") && !TS_EXPRESSIONS.has(node.type);
+
 // every node under `node`, depth first; `types` says whether to descend into TypeScript types,
 // `skip` holds subtrees that are not part of the result and so count for nothing
 function* walk(
@@ -62,7 +75,7 @@ function* walk(
   types = false,
   skip: Set<Node> = new Set(),
 ): Generator<[Node, Node | null, string]> {
-  if (skip.has(node) || (!types && node.type.startsWith("TS"))) return;
+  if (skip.has(node) || (!types && isType(node))) return;
   yield [node, parent, key];
   for (const [k, value] of Object.entries(node)) {
     if (SKIP.has(k)) continue;
@@ -303,9 +316,18 @@ export function document(
   for (const p of pockets)
     if (p.kind === "pocket") namesInType(p.typeText, referenced);
 
-  // `pocket.member` becomes `member`, unless the pocket is also handed around whole
+  // `pocket.member` becomes `member`, unless the pocket is also handed around whole,
+  // or a member would take a name the snippet already gives something else
+  const named = new Set<string>();
+  for (const [n, parent, key] of walk(node))
+    if (isReference(n, parent, key)) named.add(n.name as string);
   const whole = new Set<string>();
   for (const p of pockets) {
+    if (
+      p.kind === "pocket" &&
+      membersOf(p.typeText).some((m) => named.has(m.name))
+    )
+      whole.add(p.name);
     for (const [n, parent, key] of walk(fragment))
       if (
         isReference(n, parent, key) &&
@@ -355,10 +377,11 @@ export function document(
     (p) => p.kind === "sweater" && uses(body, p.name, removed),
   );
   if (sweaters.length) {
-    const spec = importPath(file, options.components).replace(
-      /\/index\.ts$/,
-      "",
-    );
+    // the index's directory when there is one to name; beside it, the index itself
+    const index = importPath(file, options.components);
+    const dir = path.posix.dirname(index);
+    const spec =
+      path.posix.basename(index) === "index.ts" && dir !== "." ? dir : index;
     lines.push(
       `import { ${sweaters.map((p) => (p.kind === "sweater" ? (p.member === p.name ? p.name : `${p.member} as ${p.name}`) : "")).join(", ")} } from ${quote(spec)};`,
     );
@@ -367,23 +390,34 @@ export function document(
   for (const p of pockets) {
     if (p.kind !== "pocket") continue;
     const values = new Map(options.pockets.get(p.name) ?? []);
-    const members = membersOf(p.typeText);
+    const members = membersOf(p.typeText).map((m) => ({
+      ...m,
+      type: m.type.replace(
+        new RegExp(`\\b${analysis.self}\\b`, "g"),
+        subject.name,
+      ),
+    }));
     if (whole.has(p.name)) {
-      state.push(
-        `let ${p.name} = $state({ ${[...values].map(([k, v]) => `${k}: ${v}`).join(", ")} });`,
-      );
+      // a member with no value to print keeps its type, as an empty start
+      const entries = [
+        ...members.map((m) =>
+          values.has(m.name)
+            ? `${m.name}: ${values.get(m.name)}`
+            : `${m.name}: undefined as ${m.type} | undefined`,
+        ),
+        ...[...values]
+          .filter(([k]) => !members.some((m) => m.name === k))
+          .map(([k, v]) => `${k}: ${v}`),
+      ];
+      state.push(`let ${p.name} = $state({ ${entries.join(", ")} });`);
       continue;
     }
     for (const m of members) {
       const value = values.get(m.name);
-      const type = m.type.replace(
-        new RegExp(`\\b${analysis.self}\\b`, "g"),
-        subject.name,
-      );
       if (value !== undefined) state.push(`let ${m.name} = $state(${value});`);
       else
         state.push(
-          `let ${m.name}: ${type}${m.optional ? " | undefined" : ""};`,
+          `let ${m.name}: ${m.type}${m.optional ? " | undefined" : ""};`,
         );
     }
   }
@@ -437,6 +471,7 @@ import type {
 } from "../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 import type {
   markdownFor,
+  usageAmongComponentsOf,
   usageOf,
   verifiedByOf,
 } from "./_internal/harness.ts";
@@ -493,12 +528,17 @@ declare namespace document {
 {/snippet}
 `;
 
-  /** a library component is imported from the components index; an example has no "Verified by" */
+  /** a library component is imported from the components index (by name, beside it); an example has no "Verified by" */
   export type Helpers = [
     Expect<
       Invoke<typeof usageOf, [Example, "big"]>,
       "includes",
       'import { Grid } from "../lib/components";'
+    >,
+    Expect<
+      Invoke<typeof usageAmongComponentsOf, [Example, "big"]>,
+      "includes",
+      'import { Grid } from "./index.ts";'
     >,
     Expect<Invoke<typeof verifiedByOf, [Only, "only"]>, "is", null>,
     Expect<
@@ -527,4 +567,54 @@ declare namespace document {
     "includes",
     "let pocket = $state({ n: 1 });\n</script>\n\n<C n={pocket.n} />\n<Inspect value={pocket} />"
   >;
+
+  type Cast = `
+{#snippet cast(C: typeof Self, pocket: { el: HTMLDivElement; n: Widen<1> }, test: Test)}
+  <div bind:this={pocket.el}><C n={pocket.n!} /></div>
+  {test(async ({ expect }) => {
+    const first = pocket.el.firstElementChild as HTMLElement;
+    const shown = <HTMLElement>pocket.el;
+    expect(first).toBe(shown.firstElementChild satisfies Element | null);
+    expect(pocket.n!).toBe(1);
+  })}
+{/snippet}
+`;
+
+  /** a pocket member reached through `as`, `!`, `<T>` or `satisfies` flattens too; the type beside it is no reference */
+  export type Wrapped = [
+    Expect<
+      Invoke<typeof verifiedByOf, [Cast, "cast", { pocket: { n: "1" } }]>,
+      "=",
+      "const first = el.firstElementChild as HTMLElement;\nconst shown = <HTMLElement>el;\nexpect(first).toBe(shown.firstElementChild satisfies Element | null);\nexpect(n!).toBe(1);"
+    >,
+    Expect<
+      Invoke<typeof usageOf, [Cast, "cast", { pocket: { n: "1" } }]>,
+      "includes",
+      "let el: HTMLDivElement;\n  let n = $state(1);\n</script>\n\n<div bind:this={el}><C n={n!} /></div>"
+    >,
+  ];
+
+  type Taken = `
+{#snippet taken(C: typeof Self, pocket: { grid: HTMLDivElement }, test: Test)}
+  <div bind:this={pocket.grid}><C /></div>
+  {test(async ({ expect }) => {
+    const grid = pocket.grid.firstElementChild as HTMLElement;
+    expect(grid).toBeTruthy();
+  })}
+{/snippet}
+`;
+
+  /** a member whose name the snippet already gives something else leaves the pocket whole, typed */
+  export type Collides = [
+    Expect<
+      Invoke<typeof verifiedByOf, [Taken, "taken"]>,
+      "=",
+      "const grid = pocket.grid.firstElementChild as HTMLElement;\nexpect(grid).toBeTruthy();"
+    >,
+    Expect<
+      Invoke<typeof usageOf, [Taken, "taken"]>,
+      "includes",
+      "let pocket = $state({ grid: undefined as HTMLDivElement | undefined });\n</script>\n\n<div bind:this={pocket.grid}><C /></div>"
+    >,
+  ];
 }

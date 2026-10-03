@@ -63,7 +63,10 @@ export type Options = {
    * are renamed for the length of the build and restored after.
    */
   routes?: string;
-  /** Also discover the library's own fixtures, which vendoring it must not add to a suite. */
+  /**
+   * Also discover the library's own components (their snippets test and document them) and
+   * fixtures, which vendoring it must not add to a suite. Its development repository sets it.
+   */
   _scanSelf?: boolean;
 };
 
