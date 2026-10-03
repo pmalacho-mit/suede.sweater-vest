@@ -147,18 +147,15 @@ const namesIn = (node: Node, skip: Set<Node>, into = new Set<string>()) => {
   return into;
 };
 
-const snippetNode = (source: string, snippet: TestSnippet) => {
+const snippetNode = (source: string, snippet: TestSnippet): Node => {
   const ast = parse(source, { modern: true }) as unknown as {
     fragment: { nodes: Node[] };
   };
-  const nodes = ast.fragment.nodes;
-  const at = nodes.findIndex(
+  const node = ast.fragment.nodes.find(
     (n) => n.type === "SnippetBlock" && n.start === snippet.start,
   );
-  if (at < 0) throw new Error(`no snippet at ${snippet.start}`);
-  // the comment just above it, past whitespace, describes it
-  const before = nodes.slice(0, at).filter((n) => n.type !== "Text" || (n.data as string).trim()).at(-1);
-  return { node: nodes[at]!, description: before?.type === "Comment" ? (before.data as string).trim() : null };
+  if (!node) throw new Error(`no snippet at ${snippet.start}`);
+  return node;
 };
 
 const dedent = (text: string) => {
@@ -307,7 +304,11 @@ export function document(
   options: DocumentOptions,
 ): Documented {
   const { file, source } = analysis;
-  const { node, description } = snippetNode(source, snippet);
+  const node = snippetNode(source, snippet);
+  // the comment just above the snippet describes it, unless it is a directive
+  const above = source.slice(0, snippet.start).trimEnd();
+  const comment = above.endsWith("-->") ? above.slice(above.lastIndexOf("<!--") + 4, -3).trim() : "";
+  const description = comment && !comment.startsWith("svelte-ignore") ? comment : null;
   const body = (node.body as { nodes: Node[] }).nodes;
   const subject = snippet.params.find((p) => p.kind === "subject")!;
   const test = snippet.params.find((p) => p.kind === "test")?.name ?? null;
@@ -695,12 +696,13 @@ declare namespace document {
   <C />
   <!-- inside, not the next one's -->
 {/snippet}
+<!-- svelte-ignore a11y_missing_attribute -->
 {#snippet bare(C: typeof Self)}
   <C />
 {/snippet}
 `;
 
-  /** the comment just above a snippet is its description; one inside the previous snippet is not */
+  /** the comment just above a snippet is its description; one inside the previous snippet, or a directive, is not */
   export type Describes = [
     Expect<
       Invoke<typeof markdownFor, [Described, "described", 3]>,
