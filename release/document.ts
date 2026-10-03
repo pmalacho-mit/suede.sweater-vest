@@ -361,16 +361,19 @@ export function document(
     : null;
   for (const shown of removed) s.remove(shown.start!, shown.end!);
 
-  // a top-level `{@const}` is only valid in a block: it moves to the script, derived when it reads a pocket
+  // a top-level `{@const}` is only valid in a block: it moves to the script, derived when it reads the test, a pocket or a derived const
   const hoisted: string[] = [];
+  const derived = [test, ...pockets.map((p) => p.name)];
   for (const c of body.filter((n) => n.type === "ConstTag")) {
     const d = c.declaration as Node;
     const init = (d.declarations as Node[])[0]!.init as Node;
     const value = s.slice(init.start!, init.end!);
+    const reads = derived.some((n) => n && refers(init, n));
+    if (reads) derived.push(((d.declarations as Node[])[0]!.id as Node).name as string);
     hoisted.push(
-      `${s.slice(d.start!, init.start!)}${pockets.some((p) => refers(init, p.name)) ? `$derived(${value})` : value};`,
+      `${s.slice(d.start!, init.start!)}${reads ? `$derived(${value})` : value};`,
     );
-    s.remove(c.start!, c.end! + source.slice(c.end!).match(/^\s*/)![0].length);
+    s.remove(c.start!, c.end!);
   }
 
   const first = body[0]!.start!;
@@ -663,17 +666,18 @@ declare namespace document {
   type Hoist = `
 {#snippet hoist(C: typeof Self, pocket: { n: Widen<1> }, test: Test)}
   {@const twice = pocket.n * 2}
+  {@const four = twice * 2}
   {@const label = "n"}
-  <C n={twice} {label} />
+  <C n={four} {label} />
   {test(async () => {})}
 {/snippet}
 `;
 
-  /** a top-level `{@const}` moves to the script, after the state, derived when it reads the pocket */
+  /** a top-level `{@const}` moves to the script, after the state, derived when it reads the pocket or a derived const */
   export type Hoisted = Expect<
     Invoke<typeof usageOf, [Hoist, "hoist", { pocket: { n: "1" } }]>,
     "includes",
-    'let n = $state(1);\n  const twice = $derived(n * 2);\n  const label = "n";\n</script>\n\n<C n={twice} {label} />'
+    'let n = $state(1);\n  const twice = $derived(n * 2);\n  const four = $derived(twice * 2);\n  const label = "n";\n</script>\n\n<C n={four} {label} />'
   >;
 
   type Given = `
