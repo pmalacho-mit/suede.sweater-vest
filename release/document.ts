@@ -32,6 +32,8 @@ export type DocumentOptions = {
 export type Documented = {
   name: string;
   snippet: string;
+  /** the comment just above the snippet */
+  description: string | null;
   /** a Svelte component: the usage */
   usage: string;
   /** the test body, when the snippet has a test */
@@ -145,15 +147,18 @@ const namesIn = (node: Node, skip: Set<Node>, into = new Set<string>()) => {
   return into;
 };
 
-const snippetNode = (source: string, snippet: TestSnippet): Node => {
+const snippetNode = (source: string, snippet: TestSnippet) => {
   const ast = parse(source, { modern: true }) as unknown as {
     fragment: { nodes: Node[] };
   };
-  const node = ast.fragment.nodes.find(
+  const nodes = ast.fragment.nodes;
+  const at = nodes.findIndex(
     (n) => n.type === "SnippetBlock" && n.start === snippet.start,
   );
-  if (!node) throw new Error(`no snippet at ${snippet.start}`);
-  return node;
+  if (at < 0) throw new Error(`no snippet at ${snippet.start}`);
+  // the comment just above it, past whitespace, describes it
+  const before = nodes.slice(0, at).filter((n) => n.type !== "Text" || (n.data as string).trim()).at(-1);
+  return { node: nodes[at]!, description: before?.type === "Comment" ? (before.data as string).trim() : null };
 };
 
 const dedent = (text: string) => {
@@ -302,7 +307,7 @@ export function document(
   options: DocumentOptions,
 ): Documented {
   const { file, source } = analysis;
-  const node = snippetNode(source, snippet);
+  const { node, description } = snippetNode(source, snippet);
   const body = (node.body as { nodes: Node[] }).nodes;
   const subject = snippet.params.find((p) => p.kind === "subject")!;
   const test = snippet.params.find((p) => p.kind === "test")?.name ?? null;
@@ -450,6 +455,7 @@ export function document(
   return {
     name: `${stemOf(file)} > ${snippet.name}`,
     snippet: snippet.name,
+    description,
     usage,
     verifiedBy: hasTest(snippet) ? verifiedBy : null,
   };
@@ -463,6 +469,7 @@ export const markdownOf = (doc: Documented, level: number): string =>
   [
     `${"#".repeat(level)} ${doc.snippet}`,
     "",
+    ...(doc.description ? [doc.description, ""] : []),
     fence("svelte", doc.usage),
     ...(doc.verifiedBy
       ? ["", "Verified by:", "", fence("ts", doc.verifiedBy)]
@@ -681,4 +688,29 @@ declare namespace document {
     "=",
     '<script lang="ts">\n  import C from "./Probe.svelte";\n  import type { Test } from "../lib/dsl.import.meta.vitest";\n\n  let { test }: { test: Test } = $props();\n</script>\n\n<C {test} />\n'
   >;
+
+  type Described = `
+<!-- C, described -->
+{#snippet described(C: typeof Self)}
+  <C />
+  <!-- inside, not the next one's -->
+{/snippet}
+{#snippet bare(C: typeof Self)}
+  <C />
+{/snippet}
+`;
+
+  /** the comment just above a snippet is its description; one inside the previous snippet is not */
+  export type Describes = [
+    Expect<
+      Invoke<typeof markdownFor, [Described, "described", 3]>,
+      "startsWith",
+      "### described\n\nC, described\n\n```svelte\n"
+    >,
+    Expect<
+      Invoke<typeof markdownFor, [Described, "bare", 3]>,
+      "startsWith",
+      "### bare\n\n```svelte\n"
+    >,
+  ];
 }

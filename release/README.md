@@ -403,7 +403,8 @@ node <path>/cli.ts src/lib --markdown --header-level 3 > docs.md     # every com
 ```
 
 Each snippet becomes a heading, the usage as a Svelte component, and — for a
-test — "Verified by" with the body of its test:
+test — "Verified by" with the body of its test. A comment just above the
+snippet becomes a line between the heading and the usage:
 
 ````markdown
 ### counts
