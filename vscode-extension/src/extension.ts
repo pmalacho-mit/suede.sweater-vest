@@ -112,7 +112,7 @@ const autoRunEnabled = () => vscode.workspace.getConfiguration(ID).get<boolean>(
 const isComponent = (document: vscode.TextDocument) =>
   document.uri.scheme === "file" && document.languageId === "svelte";
 
-function followDocuments({ tree, runner }: Parts, lensesChanged: vscode.EventEmitter<void>) {
+function followDocuments({ tree, runner }: Parts, lensesChanged: vscode.EventEmitter<void>, rescanWarnings: () => void) {
   const autoRun = (document: vscode.TextDocument) => {
     if (!isComponent(document)) return;
     const tests = tree.load(document.uri, document.getText());
@@ -130,16 +130,19 @@ function followDocuments({ tree, runner }: Parts, lensesChanged: vscode.EventEmi
       lensesChanged.fire();
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => (forgetLibrary(), forgetProjects())),
-    ...followConfigs(tree),
+    ...followConfigs(tree, lensesChanged, rescanWarnings),
   ];
 }
 
-// a Vite config that gains or loses the plugin moves which project its components belong to
-function followConfigs(tree: TestTree) {
+// a Vite config that gains or loses the plugin moves which project its components belong to,
+// and may bring a library whose diagnostics were not followed yet
+function followConfigs(tree: TestTree, lensesChanged: vscode.EventEmitter<void>, rescanWarnings: () => void) {
   const watcher = vscode.workspace.createFileSystemWatcher(CONFIG_GLOB);
   const changed = () => {
     forgetProjects();
     for (const document of vscode.workspace.textDocuments) if (isComponent(document)) tree.load(document.uri);
+    lensesChanged.fire();
+    rescanWarnings();
   };
   watcher.onDidChange(changed);
   watcher.onDidCreate(changed);
@@ -166,16 +169,17 @@ export function activate(context: vscode.ExtensionContext): void {
         tree.load(uri);
   };
 
+  const plugin = pluginWarnings(warnings);
   context.subscriptions.push(
     runProfile(controller, runner),
     testFileLenses(tree, runner, lensesChanged),
     extractedFileLenses(),
     ...testCommands(parts),
     ...generatedCommands(parts),
-    pluginWarnings(warnings),
+    plugin,
   );
   void controller.resolveHandler(undefined);
-  context.subscriptions.push(...followDocuments(parts, lensesChanged));
+  context.subscriptions.push(...followDocuments(parts, lensesChanged, plugin.rescan));
 }
 
 export function deactivate(): void {}
