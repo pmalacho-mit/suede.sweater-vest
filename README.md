@@ -1,6 +1,29 @@
 # sweater-vest: A svelte testing utility
 
+
+
 Sweater vest (<ins style="color:white"><span style="color:#aa1e1e"><span>**S**</span><sup style="color:grey">weater</sup> <span style="color:#aa1e1e">**v**</span><sub style="color:#aa1e1e">_elte_</sub></span> <sub style="">_t_</sub><span style="text-">est</span></ins>) is a [svelte](https://svelte.dev/) utility that simplifies testing svelte components in browser environments, specifically when you're testing multiple components together and/or within complex markup.
+
+This repo is a [suede dependency](https://github.com/pmalacho-mit/suede). 
+
+To see the installable source code, please checkout the [release branch](https://github.com/pmalacho-mit/suede.sweater-vest/tree/release).
+
+## Installation
+
+```bash
+bash <(curl -fsSL https://suede.sh/install/release) --repo pmalacho-mit/suede.sweater-vest
+```
+
+<details>
+<summary>
+See alternative to using <a href="https://github.com/pmalacho-mit/suede#suedesh">suede.sh</a> script proxy
+</summary>
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/pmalacho-mit/suede/refs/heads/main/scripts/install/release.sh) --repo pmalacho-mit/suede.sweater-vest
+```
+
+</details>
 
 The library lives in [release/](./release/README.md); this repository is where
 it is developed.
