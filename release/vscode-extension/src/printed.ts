@@ -41,4 +41,7 @@ export const printed = {
   /** The snippet as documentation: its usage, then what verifies it. */
   markdown: (uri: vscode.Uri, snippet: string, output: vscode.OutputChannel) =>
     ask(uri, [snippet, "--markdown", "--header-level", "2"], output),
+  /** Every snippet of the component as documentation, under the component's heading. */
+  documentation: (uri: vscode.Uri, output: vscode.OutputChannel) =>
+    ask(uri, ["--markdown", "--header-level", "1"], output),
 };

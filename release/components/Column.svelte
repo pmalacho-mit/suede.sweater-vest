@@ -8,7 +8,11 @@
     gap = "1rem",
     align = "start",
     children,
-  }: { gap?: string; align?: "start" | "center" | "end" | "stretch"; children: Snippet } = $props();
+  }: {
+    gap?: string;
+    align?: "start" | "center" | "end" | "stretch";
+    children: Snippet;
+  } = $props();
 </script>
 
 <div class="column" style:gap style:align-items={align}>
@@ -16,9 +20,13 @@
 </div>
 
 <!-- Column: variants stacked, with a Row of them nested inside -->
-{#snippet stacked(Column: typeof Self, Row: typeof Sweater.Row, Labeled: typeof Sweater.Labeled)}
+{#snippet stacked(
+  Column: typeof Self,
+  Row: typeof Sweater.Row,
+  Labeled: typeof Sweater.Labeled,
+)}
   <Column gap="0.5rem">
-    <Labeled label="first"><span>one</span></Labeled>
+    <Labeled label="first!"><span>one</span></Labeled>
     <Row gap="0.5rem">
       <Labeled label="second"><span>two</span></Labeled>
       <Labeled label="third"><span>three</span></Labeled>
@@ -28,7 +36,11 @@
 {/snippet}
 
 <!-- left alone: a 1rem gap, aligned to the start, and the children in the order written -->
-{#snippet defaults(Column: typeof Self, Status: typeof Sweater.Status, test: Test)}
+{#snippet defaults(
+  Column: typeof Self,
+  Status: typeof Sweater.Status,
+  test: Test,
+)}
   <Status {test} />
   <Column>
     <span>a</span>
@@ -39,7 +51,11 @@
     const column = screen.getByText("a").parentElement as HTMLElement;
     expect(column.style.gap).toBe("1rem");
     expect(column.style.alignItems).toBe("start");
-    expect([...column.children].map((child) => child.textContent)).toEqual(["a", "b", "c"]);
+    expect([...column.children].map((child) => child.textContent)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
   })}
 {/snippet}
 
@@ -54,18 +70,25 @@
   <Status {test} />
   <Row align="start">
     <Labeled label="align=center">
-      <Column align="center"><button>center</button><button>a wider one</button></Column>
+      <Column align="center"
+        ><button>center</button><button>a wider one</button></Column
+      >
     </Labeled>
     <Labeled label="align=end">
-      <Column align="end"><button>end</button><button>a wider one</button></Column>
+      <Column align="end"
+        ><button>end</button><button>a wider one</button></Column
+      >
     </Labeled>
     <Labeled label="align=stretch">
-      <Column align="stretch"><button>stretch</button><button>a wider one</button></Column>
+      <Column align="stretch"
+        ><button>stretch</button><button>a wider one</button></Column
+      >
     </Labeled>
   </Row>
   {test(async ({ expect, screen }) => {
     for (const align of ["center", "end", "stretch"]) {
-      const column = screen.getByRole("button", { name: align }).parentElement as HTMLElement;
+      const column = screen.getByRole("button", { name: align })
+        .parentElement as HTMLElement;
       expect(column.style.alignItems).toBe(align);
     }
   })}
@@ -96,5 +119,8 @@
 {/snippet}
 
 <style>
-  .column { display: flex; flex-direction: column; }
+  .column {
+    display: flex;
+    flex-direction: column;
+  }
 </style>

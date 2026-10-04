@@ -41,6 +41,14 @@
         "title": "Sweater Vest: Show What Vitest Sees"
       },
       {
+        "command": "sweater-vest.openAllPages",
+        "title": "Sweater Vest: Open All Pages of This Component"
+      },
+      {
+        "command": "sweater-vest.showDocumentation",
+        "title": "Sweater Vest: Show This Component's Snippets as Documentation"
+      },
+      {
         "command": "sweater-vest.runExtracted",
         "title": "Sweater Vest: Run Extracted Test"
       },
@@ -94,6 +102,14 @@
           "when": "editorLangId == svelte"
         },
         {
+          "command": "sweater-vest.openAllPages",
+          "when": "editorLangId == svelte"
+        },
+        {
+          "command": "sweater-vest.showDocumentation",
+          "when": "editorLangId == svelte"
+        },
+        {
           "command": "sweater-vest.showProblem",
           "when": "false"
         },
@@ -138,6 +154,25 @@
             "The system browser, at the address the editor's port forwarding resolves."
           ],
           "description": "Where \"Open page\" shows a snippet."
+        },
+        "sweater-vest.openAllLayout": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "gallery",
+            "tabs",
+            "galleryWindow",
+            "tabsWindow"
+          ],
+          "default": "ask",
+          "enumDescriptions": [
+            "Pick each time, with the last pick offered first.",
+            "One tab, every page stacked in a frame of its own.",
+            "A new tab group beside the editor, a tab per page.",
+            "The gallery, in a new window (desktop editors only).",
+            "The tab group, in a new window (desktop editors only)."
+          ],
+          "description": "How \"Open all pages\" lays out a component's pages. With `openIn: \"browser\"`, each page opens in the browser instead."
         }
       }
     }

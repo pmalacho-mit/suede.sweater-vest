@@ -24,6 +24,16 @@ path. It parses with your project's own Svelte compiler and runs the library's
 - **What Vitest sees** — at the top of a component with tests: your file diffed
   against the module Vitest is handed, which is your component without its test
   snippets plus the block that imports one generated test per snippet.
+- **Open all pages** — beside it: every snippet of the component on its page,
+  laid out as you pick: a *gallery* (one tab, each page in a frame of its own,
+  since a page's test reads the whole document) or *tabs* (a new tab group, a
+  tab per page), either one in a new window where the editor can open one
+  (desktop builds). The last pick is offered first;
+  `sweater-vest.openAllLayout` stops the asking. Every page runs its test as it
+  loads, so this is also the component's tests in a real browser.
+- **Documentation** — beside it: every snippet of the component as
+  documentation (the `--markdown` of the command line), opened as Markdown
+  with its preview in front.
 - **Extract** — writes the test out as a real file beside the component
   (`Counter.counts.vest.temp.svelte`) and opens it in the same tab group.
 - **Run · Debug · Markdown · Delete** — at the top of an extracted file.
