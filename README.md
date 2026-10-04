@@ -180,8 +180,10 @@ nothing of it reaches a build:
 | `Grid`          | a matrix of variants: `<Grid columns={3}>`                                            |
 | `Theme`         | content under `scheme="light"` or `"dark"` (`color-scheme` and `data-theme`)          |
 
-They live in [components/](./components), and `src/lib/showcase` in the
-repository shows each one in a snippet.
+They live in [components/](./components), and each carries snippets of its
+own that test it and show how it is used (`node <path>/cli.ts
+<path>/components --markdown` prints them). Vendoring the library does not add
+those tests to your suite: discovery skips the library's own folder.
 
 ### Pockets
 
@@ -401,7 +403,8 @@ node <path>/cli.ts src/lib --markdown --header-level 3 > docs.md     # every com
 ```
 
 Each snippet becomes a heading, the usage as a Svelte component, and — for a
-test — "Verified by" with the body of its test:
+test — "Verified by" with the body of its test. A comment just above the
+snippet becomes a line between the heading and the usage:
 
 ````markdown
 ### counts
@@ -411,7 +414,7 @@ test — "Verified by" with the body of its test:
   import Counter from "./Counter.svelte";
 
   let count = $state(2);
-  let el: HTMLDivElement;
+  let el = $state<HTMLDivElement>();
 </script>
 
 <div bind:this={el}>
@@ -434,7 +437,9 @@ import under the name the snippet gave it; a pocket becomes `$state` locals
 (`pocket.count` reads `count` throughout) unless the snippet also hands the
 pocket around whole, in which case it stays an object; `typeof` imports and
 `Sweater` components become real imports; `{test(…)}` and markup that only
-shows the test (`<Status {test} />`, `{test.state}`) leave the usage; the
+shows the test (`<Status {test} />`, `{test.state}`) leave the usage, but the component
+itself given `test` stays and the usage takes `test` as a prop; a top-level
+`{@const}` moves into the script, `$derived` when it reads the test or the pocket; the
 component's `<style>` comes along only if the markup uses a class from it;
 and every import nothing refers to is dropped, the DSL's first. An example
 (no `Test`) gets the usage alone. `--header-level` sets a component's heading;

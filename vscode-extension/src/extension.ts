@@ -7,7 +7,7 @@ import { debugExtracted, deleteExtracted, extractTest, markdownOfExtracted, runE
 import { generatedViews } from "./generated.ts";
 import { extractedFileLenses, testFileLenses } from "./lenses.ts";
 import { forgetLibrary } from "./library.ts";
-import { openPage } from "./page.ts";
+import { openAllPages, openPage } from "./page.ts";
 import { printed } from "./printed.ts";
 import { testRunner, type TestRunner } from "./runner.ts";
 import { childrenOf, everyItem, testTree, type TestTree } from "./tree.ts";
@@ -51,8 +51,16 @@ function testCommands({ output, tree, runner }: Parts) {
       const test = item && tree.testOf(item);
       if (item && test) await openPage(item.uri, test.snippet, test.name);
     }),
+    command("openAllPages", async (uri: vscode.Uri | undefined = activeComponent()) => {
+      if (!uri) return;
+      tree.load(uri);
+      const tests = tree.itemsOf(uri).flatMap((item) => tree.testOf(item) ?? []);
+      await openAllPages(uri, tests.filter((test) => test.generatable));
+    }),
   ];
 }
+
+const activeComponent = () => vscode.window.activeTextEditor?.document.uri;
 
 function generatedCommands({ output, showAgainst }: Parts) {
   return [
@@ -63,6 +71,19 @@ function generatedCommands({ output, showAgainst }: Parts) {
         `Could not read what Vitest sees for ${path.basename(uri.fsPath)}.`,
       );
       if (text !== null) await showAgainst(uri, text, "what Vitest sees");
+    }),
+    command("showDocumentation", async (uri: vscode.Uri | undefined = activeComponent()) => {
+      if (!uri) return;
+      const text = await orComplain(
+        printed.documentation(uri, output),
+        output,
+        `Could not document ${path.basename(uri.fsPath)}.`,
+      );
+      if (text === null) return;
+      // the markdown to copy from, and beside it in the same group, how it reads
+      const document = await vscode.workspace.openTextDocument({ language: "markdown", content: text });
+      await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.Beside, preview: false });
+      await vscode.commands.executeCommand("markdown.showPreview", document.uri);
     }),
     command("runExtracted", runExtracted),
     command("markdownExtracted", (uri: vscode.Uri) => markdownOfExtracted(uri, output)),

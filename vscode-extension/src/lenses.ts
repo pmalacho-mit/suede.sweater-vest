@@ -19,6 +19,12 @@ const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ?
 const collectorLens = (uri: vscode.Uri, tests: DiscoveredTest[]) =>
   lens(TOP, `$(diff) What Vitest sees (${plural(tests.length, "snippet")})`, "showCollector", uri);
 
+// beside it, the component as a whole: every page, and every snippet as documentation
+const componentLenses = (uri: vscode.Uri, tests: DiscoveredTest[]) =>
+  tests.some((t) => t.generatable)
+    ? [lens(TOP, "$(browser) Open all pages", "openAllPages", uri), lens(TOP, "$(book) Documentation", "showDocumentation", uri)]
+    : [];
+
 function testLenses(test: DiscoveredTest, id: string, outcome: Outcome | undefined) {
   const range = rangeOf(test);
   const failed = outcome?.state === "failed";
@@ -59,6 +65,7 @@ export const testFileLenses = (tree: TestTree, runner: TestRunner, changed: vsco
       if (!tests.length) return [];
       return [
         collectorLens(uri, tests),
+        ...componentLenses(uri, tests),
         ...tests.flatMap((test) => {
           const id = testId(uri, test.name);
           return testLenses(test, id, runner.outcomeOf(id));

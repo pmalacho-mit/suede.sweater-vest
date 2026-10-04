@@ -32,6 +32,8 @@ export type DocumentOptions = {
 export type Documented = {
   name: string;
   snippet: string;
+  /** the comment just above the snippet */
+  description: string | null;
   /** a Svelte component: the usage */
   usage: string;
   /** the test body, when the snippet has a test */
@@ -53,6 +55,19 @@ const SKIP = new Set([
   "trailingComments",
 ]);
 
+// TypeScript nodes that wrap a run-time expression — `x as T`, `x!`, `<T>x`, `x satisfies T`,
+// `f<T>`: the expression is code, only the type beside it (itself a TS node) is not
+const TS_EXPRESSIONS = new Set([
+  "TSAsExpression",
+  "TSSatisfiesExpression",
+  "TSNonNullExpression",
+  "TSTypeAssertion",
+  "TSInstantiationExpression",
+]);
+
+const isType = (node: Node) =>
+  node.type.startsWith("TS") && !TS_EXPRESSIONS.has(node.type);
+
 // every node under `node`, depth first; `types` says whether to descend into TypeScript types,
 // `skip` holds subtrees that are not part of the result and so count for nothing
 function* walk(
@@ -62,7 +77,7 @@ function* walk(
   types = false,
   skip: Set<Node> = new Set(),
 ): Generator<[Node, Node | null, string]> {
-  if (skip.has(node) || (!types && node.type.startsWith("TS"))) return;
+  if (skip.has(node) || (!types && isType(node))) return;
   yield [node, parent, key];
   for (const [k, value] of Object.entries(node)) {
     if (SKIP.has(k)) continue;
@@ -127,6 +142,8 @@ const namesIn = (node: Node, skip: Set<Node>, into = new Set<string>()) => {
   for (const [n, parent, key] of walk(node, null, "", true, skip))
     if (n.type === "Identifier" && isReference(n, parent, key))
       into.add(n.name as string);
+    // a component tag names its root too
+    else if (n.type === "Component") into.add((n.name as string).split(".")[0]!);
   return into;
 };
 
@@ -175,7 +192,7 @@ function testCall(
 }
 
 // a node that is there to show the test — an element given `test`, a tag reading it — is not usage
-function* testDisplay(body: Node[], test: string): Generator<Node> {
+function* testDisplay(body: Node[], test: string, subject: string): Generator<Node> {
   for (const node of body) {
     if (
       node.type === "ExpressionTag" ||
@@ -186,7 +203,8 @@ function* testDisplay(body: Node[], test: string): Generator<Node> {
       continue;
     }
     const attributes = (node.attributes as Node[] | undefined) ?? [];
-    if (attributes.some((a) => refers(a, test))) {
+    // the subject given `test` is usage itself
+    if (node.name !== subject && attributes.some((a) => refers(a, test))) {
       yield node;
       continue;
     }
@@ -197,10 +215,10 @@ function* testDisplay(body: Node[], test: string): Generator<Node> {
     );
     if (
       shown.length &&
-      shown.every((c) => c.type !== "Text" && refers(c, test))
+      shown.every((c) => c.type !== "Text" && refers(c, test) && !uses([c], subject, new Set()))
     )
       yield node;
-    else yield* testDisplay(children, test);
+    else yield* testDisplay(children, test, subject);
   }
 }
 
@@ -255,24 +273,26 @@ const quote = (s: string) => JSON.stringify(s);
 const printImport = (
   i: Import,
   keep: Set<string>,
-  asValue: Set<string>,
+  asValue: Map<string, string>,
 ): string | null => {
-  const def = i.bindings.find((b) => b.kind === "default" && keep.has(b.local));
+  // a value parameter's binding is imported under the parameter's name
+  const name = (b: { local: string }) => asValue.get(b.local) ?? b.local;
+  const def = i.bindings.find((b) => b.kind === "default" && keep.has(name(b)));
   const named = i.bindings.filter(
-    (b) => b.kind === "named" && keep.has(b.local),
+    (b) => b.kind === "named" && keep.has(name(b)),
   );
   const ns = i.bindings.find(
-    (b) => b.kind === "namespace" && keep.has(b.local),
+    (b) => b.kind === "namespace" && keep.has(name(b)),
   );
   if (!def && !named.length && !ns) return null;
   const typeOnly = [def, ...named, ns]
     .filter(Boolean)
     .every((b) => b!.typeOnly && !asValue.has(b!.local));
   const parts = [
-    def?.local,
-    ns ? `* as ${ns.local}` : null,
+    def && name(def),
+    ns ? `* as ${name(ns)}` : null,
     named.length
-      ? `{ ${named.map((b) => (b.kind === "named" && b.imported !== b.local ? `${b.imported} as ${b.local}` : b.local)).join(", ")} }`
+      ? `{ ${named.map((b) => (!typeOnly && b.typeOnly && !asValue.has(b.local) ? "type " : "") + (b.kind === "named" && b.imported !== name(b) ? `${b.imported} as ${name(b)}` : name(b))).join(", ")} }`
       : null,
   ].filter(Boolean);
   return `import ${typeOnly ? "type " : ""}${parts.join(", ")} from ${quote(i.specifier)};`;
@@ -286,6 +306,10 @@ export function document(
 ): Documented {
   const { file, source } = analysis;
   const node = snippetNode(source, snippet);
+  // the comment just above the snippet describes it, unless it is a directive
+  const above = source.slice(0, snippet.start).trimEnd();
+  const comment = above.endsWith("-->") ? above.slice(above.lastIndexOf("<!--") + 4, -3).trim() : "";
+  const description = comment && !comment.startsWith("svelte-ignore") ? comment : null;
   const body = (node.body as { nodes: Node[] }).nodes;
   const subject = snippet.params.find((p) => p.kind === "subject")!;
   const test = snippet.params.find((p) => p.kind === "test")?.name ?? null;
@@ -295,7 +319,7 @@ export function document(
 
   // the test, and what only shows it, leave the usage: nothing in them counts
   const call = test ? testCall(body, test) : null;
-  const removed = new Set<Node>(test ? testDisplay(body, test) : []);
+  const removed = new Set<Node>(test ? testDisplay(body, test, subject.name) : []);
   if (call) removed.add(call.tag);
 
   // what the usage keeps: everything the markup reads, and what the pockets' types name
@@ -303,9 +327,18 @@ export function document(
   for (const p of pockets)
     if (p.kind === "pocket") namesInType(p.typeText, referenced);
 
-  // `pocket.member` becomes `member`, unless the pocket is also handed around whole
+  // `pocket.member` becomes `member`, unless the pocket is also handed around whole,
+  // or a member would take a name the snippet already gives something else
+  const named = new Set<string>();
+  for (const [n, parent, key] of walk(node))
+    if (isReference(n, parent, key)) named.add(n.name as string);
   const whole = new Set<string>();
   for (const p of pockets) {
+    if (
+      p.kind === "pocket" &&
+      membersOf(p.typeText).some((m) => named.has(m.name))
+    )
+      whole.add(p.name);
     for (const [n, parent, key] of walk(fragment))
       if (
         isReference(n, parent, key) &&
@@ -329,18 +362,36 @@ export function document(
     : null;
   for (const shown of removed) s.remove(shown.start!, shown.end!);
 
+  // a top-level `{@const}` is only valid in a block: it moves to the script, derived when it reads the test, a pocket or a derived const
+  const hoisted: string[] = [];
+  const derived = [test, ...pockets.map((p) => p.name)];
+  for (const c of body.filter((n) => n.type === "ConstTag")) {
+    const d = c.declaration as Node;
+    const init = (d.declarations as Node[])[0]!.init as Node;
+    const value = s.slice(init.start!, init.end!);
+    const reads = derived.some((n) => n && refers(init, n));
+    if (reads) derived.push(((d.declarations as Node[])[0]!.id as Node).name as string);
+    hoisted.push(
+      `${s.slice(d.start!, init.start!)}${reads ? `$derived(${value})` : value};`,
+    );
+    s.remove(c.start!, c.end!);
+  }
+
   const first = body[0]!.start!;
   const last = body[body.length - 1]!.end!;
   const markup = dedent(s.slice(first, last));
 
   // the script: imports the usage reaches, then the pocket as state
-  const asValue = new Set<string>([subject.name]);
+  const asValue = new Map<string, string>([[subject.name, subject.name]]);
   const keep = new Set<string>([...referenced]);
   keep.delete(analysis.self!);
   const lines: string[] = [
     `import ${subject.name} from ${quote(`./${path.basename(file)}`)};`,
   ];
-  for (const p of snippet.params) if (p.kind === "value") asValue.add(p.local);
+  for (const p of snippet.params) if (p.kind === "value") asValue.set(p.local, p.name);
+  // the subject still given the test: the usage is handed it too
+  const dsl = test && keep.has(test) ? analysis.imports.find((i) => isDslModule(i.specifier)) : undefined;
+  if (dsl) lines.push(`import type { Test } from ${quote(dsl.specifier)};`);
   for (const i of analysis.imports) {
     // the DSL names nothing a reader writes, and the component's own type import is now the component
     if (
@@ -355,38 +406,48 @@ export function document(
     (p) => p.kind === "sweater" && uses(body, p.name, removed),
   );
   if (sweaters.length) {
-    const spec = importPath(file, options.components).replace(
-      /\/index\.ts$/,
-      "",
-    );
+    // the index's directory when there is one to name; beside it, the index itself
+    const index = importPath(file, options.components);
+    const dir = path.posix.dirname(index);
+    const spec =
+      path.posix.basename(index) === "index.ts" && dir !== "." ? dir : index;
     lines.push(
       `import { ${sweaters.map((p) => (p.kind === "sweater" ? (p.member === p.name ? p.name : `${p.member} as ${p.name}`) : "")).join(", ")} } from ${quote(spec)};`,
     );
   }
-  const state: string[] = [];
+  const state: string[] = dsl ? [`let { ${test} }: { ${test}: Test } = $props();`] : [];
   for (const p of pockets) {
     if (p.kind !== "pocket") continue;
     const values = new Map(options.pockets.get(p.name) ?? []);
-    const members = membersOf(p.typeText);
+    const members = membersOf(p.typeText).map((m) => ({
+      ...m,
+      type: m.type.replace(
+        new RegExp(`\\b${analysis.self}\\b`, "g"),
+        subject.name,
+      ),
+    }));
     if (whole.has(p.name)) {
-      state.push(
-        `let ${p.name} = $state({ ${[...values].map(([k, v]) => `${k}: ${v}`).join(", ")} });`,
-      );
+      // a member with no value to print keeps its type, as an empty start
+      const entries = [
+        ...members.map((m) =>
+          values.has(m.name)
+            ? `${m.name}: ${values.get(m.name)}`
+            : `${m.name}: undefined as ${m.type} | undefined`,
+        ),
+        ...[...values]
+          .filter(([k]) => !members.some((m) => m.name === k))
+          .map(([k, v]) => `${k}: ${v}`),
+      ];
+      state.push(`let ${p.name} = $state({ ${entries.join(", ")} });`);
       continue;
     }
     for (const m of members) {
       const value = values.get(m.name);
-      const type = m.type.replace(
-        new RegExp(`\\b${analysis.self}\\b`, "g"),
-        subject.name,
-      );
       if (value !== undefined) state.push(`let ${m.name} = $state(${value});`);
-      else
-        state.push(
-          `let ${m.name}: ${type}${m.optional ? " | undefined" : ""};`,
-        );
+      else state.push(`let ${m.name} = $state<${m.type}>();`);
     }
   }
+  state.push(...hoisted);
   const styled = classesStyled(source);
   const css =
     analysis.css && [...classesIn(node)].some((c) => styled.has(c))
@@ -399,6 +460,7 @@ export function document(
   return {
     name: `${stemOf(file)} > ${snippet.name}`,
     snippet: snippet.name,
+    description,
     usage,
     verifiedBy: hasTest(snippet) ? verifiedBy : null,
   };
@@ -412,6 +474,7 @@ export const markdownOf = (doc: Documented, level: number): string =>
   [
     `${"#".repeat(level)} ${doc.snippet}`,
     "",
+    ...(doc.description ? [doc.description, ""] : []),
     fence("svelte", doc.usage),
     ...(doc.verifiedBy
       ? ["", "Verified by:", "", fence("ts", doc.verifiedBy)]
@@ -437,6 +500,7 @@ import type {
 } from "../suede.nests.sweater-vest/dsl.import.meta.vitest.ts";
 import type {
   markdownFor,
+  usageAmongComponentsOf,
   usageOf,
   verifiedByOf,
 } from "./_internal/harness.ts";
@@ -466,7 +530,7 @@ declare namespace document {
     Expect<
       Usage,
       "startsWith",
-      '<script lang="ts">\n  import Counter from "./Probe.svelte";\n\n  let count = $state(5);\n  let el: HTMLDivElement;\n</script>'
+      '<script lang="ts">\n  import Counter from "./Probe.svelte";\n\n  let count = $state(5);\n  let el = $state<HTMLDivElement>();\n</script>'
     >,
     Expect<Usage, "includes", "<Counter bind:count={count} step={2} />">,
     Expect<Usage, "excludes", "dsl.import.meta.vitest">,
@@ -493,12 +557,17 @@ declare namespace document {
 {/snippet}
 `;
 
-  /** a library component is imported from the components index; an example has no "Verified by" */
+  /** a library component is imported from the components index (by name, beside it); an example has no "Verified by" */
   export type Helpers = [
     Expect<
       Invoke<typeof usageOf, [Example, "big"]>,
       "includes",
       'import { Grid } from "../lib/components";'
+    >,
+    Expect<
+      Invoke<typeof usageAmongComponentsOf, [Example, "big"]>,
+      "includes",
+      'import { Grid } from "./index.ts";'
     >,
     Expect<Invoke<typeof verifiedByOf, [Only, "only"]>, "is", null>,
     Expect<
@@ -527,4 +596,128 @@ declare namespace document {
     "includes",
     "let pocket = $state({ n: 1 });\n</script>\n\n<C n={pocket.n} />\n<Inspect value={pocket} />"
   >;
+
+  type Cast = `
+{#snippet cast(C: typeof Self, pocket: { el: HTMLDivElement; n: Widen<1> }, test: Test)}
+  <div bind:this={pocket.el}><C n={pocket.n!} /></div>
+  {test(async ({ expect }) => {
+    const first = pocket.el.firstElementChild as HTMLElement;
+    const shown = <HTMLElement>pocket.el;
+    expect(first).toBe(shown.firstElementChild satisfies Element | null);
+    expect(pocket.n!).toBe(1);
+  })}
+{/snippet}
+`;
+
+  /** a pocket member reached through `as`, `!`, `<T>` or `satisfies` flattens too; the type beside it is no reference */
+  export type Wrapped = [
+    Expect<
+      Invoke<typeof verifiedByOf, [Cast, "cast", { pocket: { n: "1" } }]>,
+      "=",
+      "const first = el.firstElementChild as HTMLElement;\nconst shown = <HTMLElement>el;\nexpect(first).toBe(shown.firstElementChild satisfies Element | null);\nexpect(n!).toBe(1);"
+    >,
+    Expect<
+      Invoke<typeof usageOf, [Cast, "cast", { pocket: { n: "1" } }]>,
+      "includes",
+      "let el = $state<HTMLDivElement>();\n  let n = $state(1);\n</script>\n\n<div bind:this={el}><C n={n!} /></div>"
+    >,
+  ];
+
+  type Taken = `
+{#snippet taken(C: typeof Self, pocket: { grid: HTMLDivElement }, test: Test)}
+  <div bind:this={pocket.grid}><C /></div>
+  {test(async ({ expect }) => {
+    const grid = pocket.grid.firstElementChild as HTMLElement;
+    expect(grid).toBeTruthy();
+  })}
+{/snippet}
+`;
+
+  /** a member whose name the snippet already gives something else leaves the pocket whole, typed */
+  export type Collides = [
+    Expect<
+      Invoke<typeof verifiedByOf, [Taken, "taken"]>,
+      "=",
+      "const grid = pocket.grid.firstElementChild as HTMLElement;\nexpect(grid).toBeTruthy();"
+    >,
+    Expect<
+      Invoke<typeof usageOf, [Taken, "taken"]>,
+      "includes",
+      "let pocket = $state({ grid: undefined as HTMLDivElement | undefined });\n</script>\n\n<div bind:this={pocket.grid}><C /></div>"
+    >,
+  ];
+
+  type Aliased = `
+{#snippet aliased(C: typeof Self, make: typeof createThing, Box: typeof Frame, test: Test)}
+  <Box><C thing={make({} as Thing)} /></Box>
+  {test(async () => {})}
+{/snippet}
+`;
+
+  /** a value parameter is imported as a value, under the snippet's name for it; a type beside it stays a type */
+  export type Renamed = Expect<
+    Invoke<
+      typeof usageOf,
+      [Aliased, "aliased", {}, 'import type { createThing, Thing } from "./thing.ts";\nimport type Frame from "./Frame.svelte";']
+    >,
+    "startsWith",
+    '<script lang="ts">\n  import C from "./Probe.svelte";\n  import { createThing as make, type Thing } from "./thing.ts";\n  import Box from "./Frame.svelte";\n</script>'
+  >;
+
+  type Hoist = `
+{#snippet hoist(C: typeof Self, pocket: { n: Widen<1> }, test: Test)}
+  {@const twice = pocket.n * 2}
+  {@const four = twice * 2}
+  {@const label = "n"}
+  <C n={four} {label} />
+  {test(async () => {})}
+{/snippet}
+`;
+
+  /** a top-level `{@const}` moves to the script, after the state, derived when it reads the pocket or a derived const */
+  export type Hoisted = Expect<
+    Invoke<typeof usageOf, [Hoist, "hoist", { pocket: { n: "1" } }]>,
+    "includes",
+    'let n = $state(1);\n  const twice = $derived(n * 2);\n  const four = $derived(twice * 2);\n  const label = "n";\n</script>\n\n<C n={four} {label} />'
+  >;
+
+  type Given = `
+{#snippet given(C: typeof Self, test: Test)}
+  <div><C {test} /></div>
+  {test(async () => {})}
+{/snippet}
+`;
+
+  /** the subject given the test stays, wrapped or not, and the usage is handed the test */
+  export type Subject = Expect<
+    Invoke<typeof usageOf, [Given, "given"]>,
+    "=",
+    '<script lang="ts">\n  import C from "./Probe.svelte";\n  import type { Test } from "../lib/dsl.import.meta.vitest";\n\n  let { test }: { test: Test } = $props();\n</script>\n\n<div><C {test} /></div>\n'
+  >;
+
+  type Described = `
+<!-- C, described -->
+{#snippet described(C: typeof Self)}
+  <C />
+  <!-- inside, not the next one's -->
+{/snippet}
+<!-- svelte-ignore a11y_missing_attribute -->
+{#snippet bare(C: typeof Self)}
+  <C />
+{/snippet}
+`;
+
+  /** the comment just above a snippet is its description; one inside the previous snippet, or a directive, is not */
+  export type Describes = [
+    Expect<
+      Invoke<typeof markdownFor, [Described, "described", 3]>,
+      "startsWith",
+      "### described\n\nC, described\n\n```svelte\n"
+    >,
+    Expect<
+      Invoke<typeof markdownFor, [Described, "bare", 3]>,
+      "startsWith",
+      "### bare\n\n```svelte\n"
+    >,
+  ];
 }
