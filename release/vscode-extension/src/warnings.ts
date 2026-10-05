@@ -23,8 +23,12 @@ const warningsIn = (file: string): Record<string, Warning[]> | null => {
  */
 async function diagnosticsFiles(): Promise<Set<string>> {
   const files = new Set<string>();
-  const add = (derived: string) => files.add(path.join(derived, "diagnostics.json"));
-  for (const config of await vscode.workspace.findFiles(CONFIG_GLOB, "**/node_modules/**")) {
+  const add = (derived: string) =>
+    files.add(path.join(derived, "diagnostics.json"));
+  for (const config of await vscode.workspace.findFiles(
+    CONFIG_GLOB,
+    "**/node_modules/**",
+  )) {
     const project = projectAt(path.dirname(config.fsPath));
     if (project) add(project.library.derived);
   }
@@ -37,12 +41,20 @@ async function diagnosticsFiles(): Promise<Set<string>> {
 
 // the plugin writes absolute paths; one from before it did is relative to the workspace folder
 const publish = (diagnostics: vscode.DiagnosticCollection, file: string) => {
-  const base = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(file))?.uri.fsPath ?? "";
+  const base =
+    vscode.workspace.getWorkspaceFolder(vscode.Uri.file(file))?.uri.fsPath ??
+    "";
   for (const [warned, warnings] of Object.entries(warningsIn(file) ?? {}))
     diagnostics.set(
       vscode.Uri.file(path.resolve(base, warned)),
       warnings.map((w) =>
-        diagnosticAt(w, w.message, w.severity === "warning" ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error),
+        diagnosticAt(
+          w,
+          w.message,
+          w.severity === "warning"
+            ? vscode.DiagnosticSeverity.Warning
+            : vscode.DiagnosticSeverity.Error,
+        ),
       ),
     );
 };
@@ -56,7 +68,10 @@ export function pluginWarnings(diagnostics: vscode.DiagnosticCollection) {
         if (watchers.has(file)) continue;
         publish(diagnostics, file);
         const watcher = vscode.workspace.createFileSystemWatcher(
-          new vscode.RelativePattern(vscode.Uri.file(path.dirname(file)), path.basename(file)),
+          new vscode.RelativePattern(
+            vscode.Uri.file(path.dirname(file)),
+            path.basename(file),
+          ),
         );
         const refresh = () => publish(diagnostics, file);
         watcher.onDidChange(refresh);

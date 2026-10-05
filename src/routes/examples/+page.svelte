@@ -40,7 +40,12 @@
 <Fade />
 <button onclick={() => (modal = true)}>Open modal</button>
 <Modal bind:open={modal} title="Modal" />
-<Tabs tabs={[{ label: "A", content: "a" }, { label: "B", content: "b" }]} />
+<Tabs
+  tabs={[
+    { label: "A", content: "a" },
+    { label: "B", content: "b" },
+  ]}
+/>
 <Stopwatch />
 <CartSummary {cart} />
 <Badge tone="good">badge</Badge>
