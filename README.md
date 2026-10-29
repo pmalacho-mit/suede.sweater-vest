@@ -131,9 +131,14 @@ hides them; `import type` it directly.
 Snippets only ever `import type` the DSL, and a build erases them, so an app that
 installs your library (as a [suede](https://github.com/pmalacho-mit/suede)
 source dependency) should not also need sweater-vest. The import still has to
-type-check, though. Copy [templates/optional/sweater-vest.d.ts](./templates/optional/sweater-vest.d.ts)
-into your library's source and ship it with your components. It declares
-`*/dsl.import.meta.vitest` as an ambient module with loose types.
+type-check, though. From your library, run
+
+```bash
+bash <path>/sweater-vest-suede/templates/optional/install.sh src/lib   # any folder your tsconfig includes
+```
+
+and commit the `sweater-vest.d.ts` it writes, so it ships with your components.
+It declares `*/dsl.import.meta.vitest` as an ambient module with loose types.
 
 TypeScript consults an ambient pattern module only when an import does not
 resolve to a file, so:
