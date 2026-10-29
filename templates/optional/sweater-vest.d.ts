@@ -19,7 +19,27 @@ declare module "*/dsl.import.meta.vitest" {
     readonly error: string | null;
     readonly notes: readonly string[];
   };
-  export type Widen<T> = T;
+  // Copied from suede.nests.sweater-vest; src/optional-stub.spec.ts holds it to the real one.
+  export type Widen<T> = T extends string
+    ? string
+    : T extends number
+      ? number
+      : T extends boolean
+        ? boolean
+        : T extends bigint
+          ? bigint
+          : T extends symbol
+            ? symbol
+            : T extends readonly (infer U)[]
+              ? Widen<U>[]
+              : T extends object
+                ? { -readonly [K in keyof T]: Widen<T[K]> }
+                : T;
   // `typeof Sweater.Status` and the like resolve to `any`.
   export const Sweater: any;
+}
+
+// The same module for an import that spells the extension out.
+declare module "*/dsl.import.meta.vitest.ts" {
+  export * from "sweater-vest/dsl.import.meta.vitest";
 }
