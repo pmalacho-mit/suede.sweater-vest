@@ -50,7 +50,7 @@ const exportsOf = (
   file: string,
 ) => {
   const sf = program.getSourceFile(file)!;
-  const symbol = checker.getSymbolAtLocation(sf) ?? sf.symbol;
+  const symbol = checker.getSymbolAtLocation(sf)!;
   return checker.getExportsOfModule(symbol);
 };
 
