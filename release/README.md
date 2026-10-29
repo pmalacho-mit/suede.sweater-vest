@@ -126,6 +126,29 @@ whose text contains that string (its
 DSL is what makes your tests findable. Re-exporting it from a barrel of your own
 hides them; `import type` it directly.
 
+## Keeping sweater-vest optional for consumers
+
+Snippets only ever `import type` the DSL, and a build erases them, so an app that
+installs your library (as a [suede](https://github.com/pmalacho-mit/suede)
+source dependency) should not also need sweater-vest. The import still has to
+type-check, though. Copy [templates/optional/sweater-vest.d.ts](./templates/optional/sweater-vest.d.ts)
+into your library's source and ship it with your components. It declares
+`*/dsl.import.meta.vitest` as an ambient module with loose types.
+
+TypeScript consults an ambient pattern module only when an import does not
+resolve to a file, so:
+
+- **sweater-vest not installed:** the import falls back to the stub, the project
+  compiles and `test(async ({ expect }) => …)` still completes. Snippets are
+  never collected or run, as nothing runs Vitest over them.
+- **sweater-vest installed at the imported path:** the real types win and the
+  stub is inert. Opting in means installing it and wiring the plugin (see
+  [Setup](#setup)); there is no declaration to delete.
+
+The same shape fits any in-source-testing dev dependency whose imports are
+type-only, such as the namespace tests of
+[suede.nests](https://github.com/pmalacho-mit/suede.nests).
+
 ## What counts as a test snippet
 
 A snippet is the library's when it is **never rendered** and its **first
