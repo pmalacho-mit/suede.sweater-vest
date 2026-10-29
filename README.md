@@ -134,7 +134,7 @@ source dependency) should not also need sweater-vest. The import still has to
 type-check, though. From your library, run
 
 ```bash
-bash <path>/sweater-vest-suede/templates/optional/install.sh src/lib   # any folder your tsconfig includes
+bash <path>/sweater-vest-suede/scripts/install-optional-dependency-stub.sh src/lib   # any folder your tsconfig includes
 ```
 
 and commit the `sweater-vest.d.ts` it writes, so it ships with your components.
