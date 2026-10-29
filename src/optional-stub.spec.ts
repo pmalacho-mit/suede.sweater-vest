@@ -7,7 +7,10 @@ import ts from "typescript";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
-const stubFile = path.join(root, "release/templates/optional/sweater-vest.d.ts");
+const stubFile = path.join(
+  root,
+  "release/templates/optional/sweater-vest.d.ts",
+);
 const realFile = path.join(root, "release/dsl.import.meta.vitest.ts");
 // virtual files, beside the real DSL so `./dsl.import.meta.vitest` resolves
 const probeFile = path.join(root, "release/__stub-probe__.ts");
@@ -40,7 +43,11 @@ const build = (source: string) => {
     f === probeFile
       ? ts.createSourceFile(f, source, lang, true)
       : getSourceFile(f, lang, ...rest);
-  const program = ts.createProgram([stubFile, realFile, probeFile], options, host);
+  const program = ts.createProgram(
+    [stubFile, realFile, probeFile],
+    options,
+    host,
+  );
   return { program, checker: program.getTypeChecker() };
 };
 
@@ -141,7 +148,8 @@ export type { asReal, state, back, widened, widenedMany, widenAgrees, ns };
           ts.sys,
         ).resolvedModule;
         expect(resolved).toBeUndefined();
-        const decl = checker.getSymbolsInScope(probe, ts.SymbolFlags.Alias)
+        const decl = checker
+          .getSymbolsInScope(probe, ts.SymbolFlags.Alias)
           .find((s) => s.name === "Test")!;
         const target = checker.getAliasedSymbol(decl);
         expect(target.declarations![0].getSourceFile().fileName).toBe(stubFile);
@@ -162,7 +170,9 @@ export type { Test, Ts };
         .find((s) => s.name === name)!;
       const decl = checker.getAliasedSymbol(alias).declarations![0];
       expect(decl.getSourceFile().fileName).not.toBe(stubFile);
-      expect(decl.getSourceFile().fileName).toMatch(/runtimes\/common\.svelte\.ts$/);
+      expect(decl.getSourceFile().fileName).toMatch(
+        /runtimes\/common\.svelte\.ts$/,
+      );
     }
   });
 });
