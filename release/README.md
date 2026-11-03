@@ -430,6 +430,17 @@ node <path>/cli.ts src/lib/Counter.svelte counts --markdown          # one snipp
 node <path>/cli.ts src/lib --markdown --header-level 3 > docs.md     # every component under a directory
 ```
 
+```
+node <path>/cli.ts src/lib --markdown --marked                       # only snippets marked for the documentation
+node <path>/cli.ts src/lib --markdown --source-base https://github.com/o/r/blob/main
+```
+
+Mark a snippet for the documentation with a comment just above it that opens
+with `@docs`: `<!-- @docs: Counting up from two. -->` (the rest is its
+description). `--marked` then documents only those. Each snippet's heading is
+followed by a `[source](path#Lline)` link to the `{#snippet}` in the component;
+`--source-base` puts a prefix (a repository URL, say) before the path.
+
 Each snippet becomes a heading, the usage as a Svelte component, and — for a
 test — "Verified by" with the body of its test. A comment just above the
 snippet becomes a line between the heading and the usage:

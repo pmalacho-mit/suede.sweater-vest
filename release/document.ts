@@ -34,6 +34,10 @@ export type Documented = {
   snippet: string;
   /** the comment just above the snippet */
   description: string | null;
+  /** the comment above the snippet opens with `@docs`: the author means it for the documentation */
+  marked: boolean;
+  /** 1-based line of the `{#snippet}`, for a link back to it */
+  line: number;
   /** a Svelte component: the usage */
   usage: string;
   /** the test body, when the snippet has a test */
@@ -321,8 +325,9 @@ export function document(
   const comment = above.endsWith("-->")
     ? above.slice(above.lastIndexOf("<!--") + 4, -3).trim()
     : "";
-  const description =
-    comment && !comment.startsWith("svelte-ignore") ? comment : null;
+  const marked = /^@docs\b/.test(comment);
+  const text = marked ? comment.replace(/^@docs\b:?\s*/, "") : comment;
+  const description = text && !text.startsWith("svelte-ignore") ? text : null;
   const body = (node.body as { nodes: Node[] }).nodes;
   const subject = snippet.params.find((p) => p.kind === "subject")!;
   const test = snippet.params.find((p) => p.kind === "test")?.name ?? null;
@@ -483,6 +488,8 @@ export function document(
     name: `${stemOf(file)} > ${snippet.name}`,
     snippet: snippet.name,
     description,
+    marked,
+    line: snippet.line,
     usage,
     verifiedBy: hasTest(snippet) ? verifiedBy : null,
   };
@@ -492,10 +499,16 @@ const fence = (lang: string, code: string) =>
   `\`\`\`${lang}\n${code.replace(/\n$/, "")}\n\`\`\``;
 
 /** A snippet's section: its usage, then what verifies it. */
-export const markdownOf = (doc: Documented, level: number): string =>
+export const markdownOf = (
+  doc: Documented,
+  level: number,
+  /** where the component is, for a link from the heading to the snippet's line in it */
+  source?: string,
+): string =>
   [
     `${"#".repeat(level)} ${doc.snippet}`,
     "",
+    ...(source ? [`[source](${source}#L${doc.line})`, ""] : []),
     ...(doc.description ? [doc.description, ""] : []),
     fence("svelte", doc.usage),
     ...(doc.verifiedBy
@@ -509,11 +522,12 @@ export const markdownForComponent = (
   analysis: Analysis,
   docs: Documented[],
   level: number,
+  source?: string,
 ): string =>
   [
     `${"#".repeat(level)} ${stemOf(analysis.file)}`,
     "",
-    ...docs.map((d) => markdownOf(d, level + 1)),
+    ...docs.map((d) => markdownOf(d, level + 1, source)),
   ].join("\n");
 
 import type {

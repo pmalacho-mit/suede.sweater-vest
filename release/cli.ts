@@ -34,7 +34,7 @@ const DESCRIPTION = [
   "  cli.ts <component> --list          the component's test snippets, as JSON",
   "  cli.ts <component> --collector     the component as Vitest is handed it",
   "  cli.ts --clean-extracted [dir]     delete extracted tests under dir (default: the working directory)",
-  "  cli.ts <component|dir> [snippet] --markdown [--header-level N]   the snippets as documentation, for a README",
+  "  cli.ts <component|dir> [snippet] --markdown [--marked] [--source-base URL] [--header-level N]   the snippets as documentation, for a README",
 ].join("\n");
 
 /** What was asked for, read off an argv; kept apart from acting on it so it can be tested without a process. */
@@ -59,6 +59,15 @@ const parse = (argv: string[]) => {
       "markdown",
       "Print the snippets as documentation: the usage, then what verifies it. A directory documents every component under it.",
       false,
+    ),
+    cli.flag(
+      "marked",
+      "With --markdown, document only snippets whose comment opens with @docs (<!-- @docs: what it shows -->).",
+      false,
+    ),
+    cli.flag(
+      "source-base",
+      "With --markdown, the link target for a component's file is this prefix plus its path relative to the working directory (default: the path alone, so a link from a README at the working directory works).",
     ),
     cli.flag(
       ["header-level", "h"],
@@ -96,6 +105,8 @@ const parse = (argv: string[]) => {
               : "test",
     tsconfig: args.tsconfig ?? "tsconfig.json",
     headerLevel: args["header-level"],
+    marked: args.marked,
+    sourceBase: args["source-base"],
     force: args.force,
     help: args.help,
   } as const;
@@ -255,6 +266,8 @@ async function printMarkdown(
   snippet: string | undefined,
   level: number,
   tsconfig: string,
+  marked: boolean,
+  sourceBase: string | undefined,
 ) {
   const { pocketValues } = await import("./vite-plugin/pocket-values.ts");
   const values = pocketValues(process.cwd(), tsconfig);
@@ -270,20 +283,27 @@ async function printMarkdown(
     );
     if (snippet && !snippets.length)
       throw new Error(`no test snippet named ${snippet} in ${shown(file)}`);
-    const docs = snippets.map((s) => {
-      const pockets = new Map(
-        [...values.forSnippet(analysis, s)].map(([name, value]) => [
-          name,
-          value.members,
-        ]),
-      );
-      return document(analysis, s, { components: componentsFile, pockets });
-    });
+    const docs = snippets
+      .map((s) => {
+        const pockets = new Map(
+          [...values.forSnippet(analysis, s)].map(([name, value]) => [
+            name,
+            value.members,
+          ]),
+        );
+        return document(analysis, s, { components: componentsFile, pockets });
+      })
+      .filter((d) => !marked || d.marked);
     if (!docs.length) continue;
+    const rel = posix(path.relative(process.cwd(), file));
+    const link =
+      sourceBase === undefined
+        ? rel
+        : `${sourceBase.replace(/\/$/, "")}/${rel}`;
     sections.push(
       snippet
-        ? markdownOf(docs[0]!, level)
-        : markdownForComponent(analysis, docs, level),
+        ? markdownOf(docs[0]!, level, link)
+        : markdownForComponent(analysis, docs, level, link),
     );
   }
   return `${sections.join("\n")}`;
@@ -325,11 +345,20 @@ async function run({
   force,
   help,
   headerLevel,
+  marked,
+  sourceBase,
 }: Parsed) {
   if (mode === "clean") return cleanExtracted(path.resolve(file ?? "."), force);
   if (mode === "markdown" && file)
     return void process.stdout.write(
-      await printMarkdown(file, snippet, headerLevel, tsconfig),
+      await printMarkdown(
+        file,
+        snippet,
+        headerLevel,
+        tsconfig,
+        marked,
+        sourceBase,
+      ),
     );
   if (!file || ((mode === "test" || mode === "extract") && !snippet)) {
     console.error(help());
