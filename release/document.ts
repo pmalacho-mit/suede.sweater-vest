@@ -504,9 +504,11 @@ export const markdownOf = (
   level: number,
   /** where the component is, for a link from the heading to the snippet's line in it */
   source?: string,
+  /** the heading's text, where the snippet's name alone would not say whose it is */
+  title: string = doc.snippet,
 ): string =>
   [
-    `${"#".repeat(level)} ${doc.snippet}`,
+    `${"#".repeat(level)} ${title}`,
     "",
     ...(source ? [`[source](${source}#L${doc.line})`, ""] : []),
     ...(doc.description ? [doc.description, ""] : []),

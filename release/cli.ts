@@ -16,9 +16,17 @@ import {
   componentsFile,
   runtimeFile,
 } from "./vite-plugin/plugin.ts";
-import { generatedId, posix, testName } from "./vite-plugin/names.ts";
+import { generatedId, posix, stemOf, testName } from "./vite-plugin/names.ts";
 import { SUFFIX, extract, extracted, tempPathFor } from "./extract.ts";
 import { document, markdownForComponent, markdownOf } from "./document.ts";
+import {
+  populate,
+  rename,
+  suggest,
+  blocks,
+  idText,
+  type Id,
+} from "./readme.ts";
 
 import type {
   Expect,
@@ -35,6 +43,8 @@ const DESCRIPTION = [
   "  cli.ts <component> --collector     the component as Vitest is handed it",
   "  cli.ts --clean-extracted [dir]     delete extracted tests under dir (default: the working directory)",
   "  cli.ts <component|dir> [snippet] --markdown [--marked] [--source-base URL] [--header-level N]   the snippets as documentation, for a README",
+  "  cli.ts [dir] --readme <README.md> [--marked] [--prune]   write the snippets into a README, between fences that name them",
+  "  cli.ts --migrate <README.md> --from <path[ > snippet]> --to <path[ > snippet]>   follow a renamed component or snippet",
 ].join("\n");
 
 /** What was asked for, read off an argv; kept apart from acting on it so it can be tested without a process. */
@@ -70,6 +80,24 @@ const parse = (argv: string[]) => {
       "With --markdown, the link target for a component's file is this prefix plus its path relative to the working directory (default: the path alone, so a link from a README at the working directory works).",
     ),
     cli.flag(
+      "readme",
+      "Write the snippets into this README, each between fences naming its component and snippet, so a re-run rewrites only those. Documents the components under the positional directory (default: the README's).",
+    ),
+    cli.flag(
+      "prune",
+      "With --readme, remove blocks whose component or snippet is gone (they are otherwise reported and kept).",
+      false,
+    ),
+    cli.flag(
+      "migrate",
+      "A README whose generated blocks should follow a rename: with --from and --to, rewrites only their fences.",
+    ),
+    cli.flag(
+      "from",
+      "With --migrate, the old component path, or 'path > snippet'.",
+    ),
+    cli.flag("to", "With --migrate, the new one."),
+    cli.flag(
       ["header-level", "h"],
       "The heading level of a component in the Markdown; its snippets sit one below.",
       2,
@@ -92,17 +120,26 @@ const parse = (argv: string[]) => {
   return {
     file: args[0],
     snippet: args[1],
-    mode: args.list
-      ? "list"
-      : args.collector
-        ? "collector"
-        : args["clean-extracted"]
-          ? "clean"
-          : args.extract
-            ? "extract"
-            : args.markdown
-              ? "markdown"
-              : "test",
+    readme: args.readme,
+    prune: args.prune,
+    migrate: args.migrate,
+    from: args.from,
+    to: args.to,
+    mode: args.migrate
+      ? "migrate"
+      : args.readme
+        ? "readme"
+        : args.list
+          ? "list"
+          : args.collector
+            ? "collector"
+            : args["clean-extracted"]
+              ? "clean"
+              : args.extract
+                ? "extract"
+                : args.markdown
+                  ? "markdown"
+                  : "test",
     tsconfig: args.tsconfig ?? "tsconfig.json",
     headerLevel: args["header-level"],
     marked: args.marked,
@@ -309,6 +346,102 @@ async function printMarkdown(
   return `${sections.join("\n")}`;
 }
 
+/** Writes the snippets under `target` into a README, between fences; says what changed. */
+async function populateReadme(
+  readme: string,
+  target: string | undefined,
+  level: number,
+  tsconfig: string,
+  marked: boolean,
+  prune: boolean,
+  sourceBase: string | undefined,
+  snippet: string | undefined,
+) {
+  const { pocketValues } = await import("./vite-plugin/pocket-values.ts");
+  const values = pocketValues(process.cwd(), tsconfig);
+  const home = path.dirname(path.resolve(readme));
+  const root = path.resolve(target ?? home);
+  const components = fs.statSync(root).isDirectory()
+    ? [...componentsUnder(root)]
+    : [root];
+  const analyses = new Map<string, Analysis>();
+  const load = (file: string) => {
+    const abs = path.resolve(file);
+    if (!analyses.has(abs))
+      analyses.set(abs, analyze(abs, fs.readFileSync(abs, "utf8")));
+    return analyses.get(abs)!;
+  };
+  const idOf = (file: string, name: string): Id => ({
+    file: posix(path.relative(home, file)),
+    snippet: name,
+  });
+  const entries = [];
+  const all: Id[] = [];
+  for (const file of components) {
+    const analysis = load(file);
+    for (const s of analysis.snippets) {
+      if (!isGeneratable(s)) continue;
+      all.push(idOf(file, s.name));
+      if (snippet && s.name !== snippet) continue;
+      const pockets = new Map(
+        [...values.forSnippet(analysis, s)].map(([name, value]) => [
+          name,
+          value.members,
+        ]),
+      );
+      const doc = document(analysis, s, {
+        components: componentsFile,
+        pockets,
+      });
+      if (marked && !doc.marked) continue;
+      const id = idOf(file, s.name);
+      const link = sourceBase
+        ? `${sourceBase.replace(/\/$/, "")}/${posix(path.relative(process.cwd(), file))}`
+        : id.file;
+      entries.push({
+        ...id,
+        markdown: markdownOf(doc, level, link, `${stemOf(file)}.${s.name}`),
+      });
+    }
+  }
+  if (snippet && !entries.length)
+    throw new Error(`no test snippet named ${snippet} under ${shown(root)}`);
+  const existing = fs.existsSync(readme) ? fs.readFileSync(readme, "utf8") : "";
+  const exists = (id: Id) => {
+    const file = path.join(home, id.file);
+    return (
+      fs.existsSync(file) &&
+      load(file).snippets.some((s) => s.name === id.snippet)
+    );
+  };
+  const result = populate(existing, entries, exists, prune);
+  if (result.text !== existing) fs.writeFileSync(readme, result.text);
+  const said = (verb: string, ids: string[]) =>
+    ids.forEach((id) => console.log(`${verb} ${id}`));
+  said("added    ", result.added);
+  said("updated  ", result.updated);
+  said("pruned   ", result.pruned);
+  const hasBlock = (id: Id) =>
+    blocks(result.text).some((b) => idText(b) === idText(id));
+  for (const key of result.stale) {
+    const [old] = blocks(existing).filter((b) => idText(b) === key);
+    console.log(`stale    ${key} — its snippet is gone (--prune removes it)`);
+    for (const to of old ? suggest(old, all, hasBlock) : [])
+      console.log(
+        `         moved? cli.ts --migrate ${readme} --from "${key}" --to "${idText(to)}"`,
+      );
+  }
+  if (!result.added.length && !result.updated.length && !result.pruned.length)
+    console.log(`${readme} is up to date`);
+}
+
+function migrateReadme(readme: string, from: string, to: string) {
+  const { text, moved } = rename(fs.readFileSync(readme, "utf8"), from, to);
+  fs.writeFileSync(readme, text);
+  for (const m of moved) console.log(`moved    ${m}`);
+  console.log(`run --readme ${readme} to refresh what they say`);
+}
+
 // every component with snippets under a directory
 function* componentsUnder(dir: string): Generator<string> {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -347,8 +480,31 @@ async function run({
   headerLevel,
   marked,
   sourceBase,
+  readme,
+  prune,
+  migrate,
+  from,
+  to,
 }: Parsed) {
   if (mode === "clean") return cleanExtracted(path.resolve(file ?? "."), force);
+  if (mode === "migrate") {
+    if (!from || !to) {
+      console.error("--migrate needs --from and --to");
+      process.exit(2);
+    }
+    return migrateReadme(migrate!, from, to);
+  }
+  if (mode === "readme")
+    return populateReadme(
+      readme!,
+      file,
+      headerLevel,
+      tsconfig,
+      marked,
+      prune,
+      sourceBase,
+      snippet,
+    );
   if (mode === "markdown" && file)
     return void process.stdout.write(
       await printMarkdown(

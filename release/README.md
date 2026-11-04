@@ -485,6 +485,37 @@ and every import nothing refers to is dropped, the DSL's first. An example
 its snippets sit one level below. The editor extension shows the same for an
 extracted file.
 
+### Keeping a README up to date
+
+`--readme` writes the snippets into a README you also write by hand, and a re-run
+rewrites only what it wrote:
+
+```
+node <path>/cli.ts src/lib --readme src/lib/README.md [--marked] [--prune]
+node <path>/cli.ts --migrate src/lib/README.md --from "Old.svelte" --to "lib/New.svelte"
+```
+
+Each snippet sits between fences that name where it comes from — the component's
+path from the README's folder, and the snippet:
+
+```markdown
+<!-- sweater-vest:begin Counter.svelte > binds -->
+…generated…
+<!-- sweater-vest:end Counter.svelte > binds -->
+```
+
+That pair is the identity. A block already there is rewritten in place (edits
+inside it are overwritten; text outside is never touched); a new snippet goes
+after the last block of its component, or at the end; `--marked` and a named
+snippet limit what is written, and never make the rest stale. A block whose
+component or snippet no longer exists is reported and kept, with a suggested
+`--migrate` when the same snippet turns up elsewhere; `--prune` removes it.
+
+After you rename a component or a snippet, `--migrate` rewrites only the fences:
+`--from`/`--to` take a path (every block of that component) or
+`path > snippet` (one block). The next `--readme` refreshes what the blocks say.
+`--source-base` works as for `--markdown`; links are otherwise relative to the README.
+
 ## Where things are written
 
 `.derived/` inside this folder holds `diagnostics.json`: what the plugin could
