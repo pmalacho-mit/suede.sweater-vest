@@ -36,6 +36,8 @@ export type Documented = {
   description: string | null;
   /** the comment above the snippet opens with `@docs`: the author means it for the documentation */
   marked: boolean;
+  /** `@docs screenshot` (or `screenshot=end`): when to photograph what the snippet shows */
+  screenshot: "start" | "end" | null;
   /** 1-based line of the `{#snippet}`, for a link back to it */
   line: number;
   /** a Svelte component: the usage */
@@ -151,6 +153,25 @@ const namesIn = (node: Node, skip: Set<Node>, into = new Set<string>()) => {
       into.add((n.name as string).split(".")[0]!);
   return into;
 };
+
+/**
+ * `@docs`, optionally `screenshot` (taken at the start of the test, or at its
+ * end as `screenshot=end`), optionally `: a description`.
+ */
+export function readMarker(comment: string) {
+  const m =
+    /^@docs\b(?:[ \t]+screenshot(?:=(start|end))?\b)?[ \t]*(?::[ \t]*)?/.exec(
+      comment,
+    );
+  if (!m) return { marked: false, screenshot: null, text: comment };
+  return {
+    marked: true,
+    screenshot: /screenshot/.test(m[0])
+      ? ((m[1] as "start" | "end" | undefined) ?? "start")
+      : null,
+    text: comment.slice(m[0].length),
+  };
+}
 
 const snippetNode = (source: string, snippet: TestSnippet): Node => {
   const ast = parse(source, { modern: true }) as unknown as {
@@ -325,8 +346,7 @@ export function document(
   const comment = above.endsWith("-->")
     ? above.slice(above.lastIndexOf("<!--") + 4, -3).trim()
     : "";
-  const marked = /^@docs\b/.test(comment);
-  const text = marked ? comment.replace(/^@docs\b:?\s*/, "") : comment;
+  const { marked, screenshot, text } = readMarker(comment);
   const description = text && !text.startsWith("svelte-ignore") ? text : null;
   const body = (node.body as { nodes: Node[] }).nodes;
   const subject = snippet.params.find((p) => p.kind === "subject")!;
@@ -489,6 +509,7 @@ export function document(
     snippet: snippet.name,
     description,
     marked,
+    screenshot,
     line: snippet.line,
     usage,
     verifiedBy: hasTest(snippet) ? verifiedBy : null,
@@ -506,12 +527,17 @@ export const markdownOf = (
   source?: string,
   /** the heading's text, where the snippet's name alone would not say whose it is */
   title: string = doc.snippet,
+  /** where a screenshot of it lives */
+  image?: string,
 ): string =>
   [
     `${"#".repeat(level)} ${title}`,
     "",
     ...(source ? [`[source](${source}#L${doc.line})`, ""] : []),
     ...(doc.description ? [doc.description, ""] : []),
+    ...(image
+      ? [`![${title}](${/[\s()]/.test(image) ? `<${image}>` : image})`, ""]
+      : []),
     fence("svelte", doc.usage),
     ...(doc.verifiedBy
       ? ["", "Verified by:", "", fence("ts", doc.verifiedBy)]

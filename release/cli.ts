@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { cli, main } from "./vendored/typescript-cli-suede/index.ts";
@@ -27,6 +28,15 @@ import {
   idText,
   type Id,
 } from "./readme.ts";
+import {
+  isFresh,
+  readCache,
+  resolveHook,
+  settle,
+  shoot,
+  writeCache,
+  type Cached,
+} from "./screenshots.ts";
 
 import type {
   Expect,
@@ -43,7 +53,7 @@ const DESCRIPTION = [
   "  cli.ts <component> --collector     the component as Vitest is handed it",
   "  cli.ts --clean-extracted [dir]     delete extracted tests under dir (default: the working directory)",
   "  cli.ts <component|dir> [snippet] --markdown [--marked] [--source-base URL] [--header-level N]   the snippets as documentation, for a README",
-  "  cli.ts [dir] --readme <README.md> [--marked] [--prune]   write the snippets into a README, between fences that name them",
+  "  cli.ts [dir] --readme <README.md> [--marked] [--prune] [--screenshots <hook>]   write the snippets into a README, between fences that name them",
   "  cli.ts --migrate <README.md> --from <path[ > snippet]> --to <path[ > snippet]>   follow a renamed component or snippet",
 ].join("\n");
 
@@ -84,6 +94,25 @@ const parse = (argv: string[]) => {
       "Write the snippets into this README, each between fences naming its component and snippet, so a re-run rewrites only those. Documents the components under the positional directory (default: the README's).",
     ),
     cli.flag(
+      "screenshots",
+      "With --readme, photograph snippets marked '@docs screenshot' in the dev server's pages and hand each PNG to this hook for a URL: inline, file:<dir>, or the path of a module whose default export is (shot) => url. A component unchanged since its last screenshot is not photographed again.",
+    ),
+    cli.flag(
+      "server",
+      "With --screenshots, where the dev server is.",
+      "http://localhost:5173",
+    ),
+    cli.flag(
+      "route",
+      "With --screenshots, the route that renders a snippet on a page.",
+      "/vests",
+    ),
+    cli.flag(
+      "refresh",
+      "With --screenshots, photograph every marked snippet again.",
+      false,
+    ),
+    cli.flag(
       "prune",
       "With --readme, remove blocks whose component or snippet is gone (they are otherwise reported and kept).",
       false,
@@ -122,6 +151,10 @@ const parse = (argv: string[]) => {
     snippet: args[1],
     readme: args.readme,
     prune: args.prune,
+    screenshots: args.screenshots,
+    server: args.server,
+    route: args.route,
+    refresh: args.refresh,
     migrate: args.migrate,
     from: args.from,
     to: args.to,
@@ -346,6 +379,75 @@ async function printMarkdown(
   return `${sections.join("\n")}`;
 }
 
+type ShotOptions = {
+  /** the hook, as named on the command line; absent: only what is cached speaks */
+  hook: string | undefined;
+  server: string;
+  route: string;
+  timeoutMs: number;
+  refresh: boolean;
+};
+
+type Documented = {
+  id: Id;
+  file: string;
+  doc: { screenshot: "start" | "end" | null };
+};
+
+/** Photographs what is due, and hands the files to the hook. */
+async function screenshotsFor(
+  wanted: Documented[],
+  cached: Record<string, Cached>,
+  home: string,
+  options: ShotOptions,
+) {
+  const hook = options.hook
+    ? { spec: options.hook, run: await resolveHook(options.hook, home) }
+    : null;
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "sweater-vest-shots-"));
+  try {
+    const items = wanted.map((w) => ({
+      id: w.id,
+      source: fs.readFileSync(w.file, "utf8"),
+      key: `${posix(path.relative(process.cwd(), w.file)).replace(/\.svelte$/, "")}/${w.id.snippet}`,
+      when: w.doc.screenshot!,
+    }));
+    const due = hook
+      ? items.filter(
+          (i) =>
+            !isFresh(
+              i.source,
+              cached[`${i.id.file} > ${i.id.snippet}`],
+              hook.spec,
+              options.refresh,
+            ),
+        )
+      : [];
+    const taken = await shoot(
+      due.map((i) => ({ key: i.key, when: i.when })),
+      { ...options, dir: scratch },
+    );
+    return await settle(
+      items.map((i) => ({
+        id: i.id,
+        source: i.source,
+        take: async () => {
+          const r = taken.get(i.key);
+          if (!r || "error" in r)
+            throw new Error(r?.error ?? "not photographed");
+          return r.path;
+        },
+      })),
+      cached,
+      hook,
+      options.refresh,
+      scratch,
+    );
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
 /** Writes the snippets under `target` into a README, between fences; says what changed. */
 async function populateReadme(
   readme: string,
@@ -356,6 +458,7 @@ async function populateReadme(
   prune: boolean,
   sourceBase: string | undefined,
   snippet: string | undefined,
+  shots: ShotOptions,
 ) {
   const { pocketValues } = await import("./vite-plugin/pocket-values.ts");
   const values = pocketValues(process.cwd(), tsconfig);
@@ -375,7 +478,12 @@ async function populateReadme(
     file: posix(path.relative(home, file)),
     snippet: name,
   });
-  const entries = [];
+  const documented: {
+    id: Id;
+    file: string;
+    doc: ReturnType<typeof document>;
+    link: string;
+  }[] = [];
   const all: Id[] = [];
   for (const file of components) {
     const analysis = load(file);
@@ -398,14 +506,34 @@ async function populateReadme(
       const link = sourceBase
         ? `${sourceBase.replace(/\/$/, "")}/${posix(path.relative(process.cwd(), file))}`
         : id.file;
-      entries.push({
-        ...id,
-        markdown: markdownOf(doc, level, link, `${stemOf(file)}.${s.name}`),
-      });
+      documented.push({ id, file, doc, link });
     }
   }
-  if (snippet && !entries.length)
+  if (snippet && !documented.length)
     throw new Error(`no test snippet named ${snippet} under ${shown(root)}`);
+
+  // screenshots: from the browser through the hook, or just the cache's say
+  const readmeKey = posix(path.relative(process.cwd(), path.resolve(readme)));
+  const cache = readCache();
+  const settled = await screenshotsFor(
+    documented.filter((d) => d.doc.screenshot),
+    cache[readmeKey] ?? {},
+    home,
+    shots,
+  );
+  cache[readmeKey] = settled.cache;
+  const entries = documented.map(({ id, file, doc, link }) => ({
+    ...id,
+    markdown: markdownOf(
+      doc,
+      level,
+      link,
+      `${stemOf(file)}.${id.snippet}`,
+      doc.screenshot
+        ? settled.urls.get(`${id.file} > ${id.snippet}`)
+        : undefined,
+    ),
+  }));
   const existing = fs.existsSync(readme) ? fs.readFileSync(readme, "utf8") : "";
   const exists = (id: Id) => {
     const file = path.join(home, id.file);
@@ -416,6 +544,13 @@ async function populateReadme(
   };
   const result = populate(existing, entries, exists, prune);
   if (result.text !== existing) fs.writeFileSync(readme, result.text);
+  for (const gone of result.pruned) delete cache[readmeKey]![gone];
+  writeCache(cache);
+  for (const [id, why] of settled.failed)
+    console.error(`no screenshot for ${id}: ${why}`);
+  for (const id of settled.hooked) console.log(`shot     ${id}`);
+  for (const id of settled.reused)
+    console.log(`unchanged ${id} (screenshot kept)`);
   const said = (verb: string, ids: string[]) =>
     ids.forEach((id) => console.log(`${verb} ${id}`));
   said("added    ", result.added);
@@ -482,6 +617,10 @@ async function run({
   sourceBase,
   readme,
   prune,
+  screenshots,
+  server,
+  route,
+  refresh,
   migrate,
   from,
   to,
@@ -504,6 +643,7 @@ async function run({
       prune,
       sourceBase,
       snippet,
+      { hook: screenshots, server, route, refresh, timeoutMs: 60_000 },
     );
   if (mode === "markdown" && file)
     return void process.stdout.write(

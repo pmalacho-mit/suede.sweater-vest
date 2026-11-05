@@ -516,10 +516,59 @@ After you rename a component or a snippet, `--migrate` rewrites only the fences:
 `path > snippet` (one block). The next `--readme` refreshes what the blocks say.
 `--source-base` works as for `--markdown`; links are otherwise relative to the README.
 
+### Screenshots
+
+A snippet asks for one in its marker:
+
+```svelte
+<!-- @docs screenshot: counting up from two -->
+<!-- @docs screenshot=end: what it looks like once the test is through with it -->
+```
+
+`screenshot` is taken at the start of the test, `screenshot=end` after its body.
+It needs no `capture` call in the test: the page, opened with `?docs=`, photographs
+what the snippet shows (cropped to its content, at a fixed viewport, animations
+off, so an unchanged component gives the same PNG). It takes a running dev server and
+Chromium (`npx playwright install chromium`).
+
+```
+node <path>/cli.ts src/lib --readme src/lib/README.md --screenshots file:screenshots
+```
+
+`--screenshots` names a **hook**, which turns each PNG into the URL the README links to:
+
+| hook | answers |
+| --- | --- |
+| `inline` | a `data:` URI: nothing to host, a README that is mostly base64 |
+| `file:<dir>` | copies the PNG into `<dir>` (from the README's folder), a relative path |
+| `./my-hook.ts` | whatever your module's default export answers |
+
+```ts
+// my-hook.ts: (shot) => url | null, sync or async
+export default async ({ path, id, hash }) => {
+  await upload(path, `${id.snippet}-${hash}.png`);
+  return `https://cdn.example/${id.snippet}-${hash}.png`;
+};
+```
+
+`path` is a temporary PNG, removed when the hook returns; `id` is the component's
+path from the README's folder and the snippet (the fences' identity); `hash` is of
+the PNG's bytes. `null` leaves the snippet without an image; a throw reports that
+snippet and carries on.
+
+What each hook answered is remembered in `.derived/screenshots.json` (not
+committed), with a hash of the component's source. A component unchanged since,
+with the same hook, is neither photographed nor handed to the hook again —
+`--refresh` does both anyway. Without `--screenshots`, a README run still links
+the remembered URL, until the component changes. The hash covers the component
+file only, not what it imports: `--refresh` after changing a dependency. Images
+are written into the README only; `--markdown` does not link them.
+
 ## Where things are written
 
 `.derived/` inside this folder holds `diagnostics.json`: what the plugin could
-not hand in, by each component's absolute path, which the editor reads. It
+not hand in, by each component's absolute path, which the editor reads, and
+`screenshots.json`: what each documentation screenshot's hook answered. It
 ignores itself in git; delete it freely.
 
 When the dev server runs in a container whose port is published somewhere

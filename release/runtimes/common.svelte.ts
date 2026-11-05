@@ -79,6 +79,12 @@ export const pocket = <T extends object>(initial: Partial<T> = {}): T => {
 // ── the harness ──────────────────────────────────────────────────────────────
 
 export type Env = Omit<Payload, "flushSync" | "tick" | "note" | "capture"> & {
+  /**
+   * The documentation's screenshot, taken at the start of the body or its end:
+   * called at both, answers a data URI at the one it was asked for. Left out
+   * where nobody is asking (everywhere but a page opened with `?docs=`).
+   */
+  docs?: (when: DocsMoment) => Promise<string | null>;
   /** Draws a capture; left out where nothing can (under Vitest). */
   capture?: Payload["capture"];
   /** Told about every `note` as it is written. */
@@ -113,6 +119,11 @@ const messageOf = (error: unknown) =>
  * markup is mounted (so every `bind:this` has been set). `test.state` and
  * `test.error` follow along, reactively, for the snippet to show.
  */
+export type DocsMoment = "start" | "end";
+
+/** The name the documentation's screenshot goes by among a run's captures. */
+export const DOCS_CAPTURE = "docs";
+
 export function createHarness(
   name: string,
   env: Env,
@@ -124,7 +135,7 @@ export function createHarness(
   let calls = 0;
   const notes = $state<string[]>([]);
   const captures: Captured[] = [];
-  const { onNote, capture, ...rest } = env;
+  const { onNote, capture, docs, ...rest } = env;
 
   const payload: Payload = {
     ...rest,
@@ -155,6 +166,11 @@ export function createHarness(
     },
   ) as unknown as Test;
 
+  const forDocs = async (when: DocsMoment) => {
+    const dataUri = docs ? await docs(when) : null;
+    if (dataUri) captures.push({ name: DOCS_CAPTURE, dataUri });
+  };
+
   return {
     test,
     notes,
@@ -163,9 +179,11 @@ export function createHarness(
       try {
         flushSync();
         await tick();
+        await forDocs("start");
         // an example has no body: mounting without throwing is its test
         if (!body && expectsBody) throw new Error(NEVER_CALLED);
         if (body) await body(payload);
+        await forDocs("end");
         state = "passed";
       } catch (e) {
         error = messageOf(e);
@@ -201,6 +219,54 @@ export async function capture(target?: HTMLElement): Promise<string | null> {
   } finally {
     target.removeAttribute(MARK);
   }
+}
+
+/** The screenshot function for a region of the page, which the docs runner exposes; absent on a page opened by hand. */
+export const DOCS_BINDING = "__sweaterVestDocs";
+
+export type Clip = { x: number; y: number; width: number; height: number };
+
+declare global {
+  interface Window {
+    [DOCS_BINDING]?: (clip: Clip) => Promise<string>;
+  }
+}
+
+const PADDING = 8;
+
+/** The smallest box, in page coordinates, around everything inside `root` that takes up room, with a little air. */
+export function contentClip(root: HTMLElement): Clip | null {
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const el of root.querySelectorAll("*")) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    left = Math.min(left, r.left);
+    top = Math.min(top, r.top);
+    right = Math.max(right, r.right);
+    bottom = Math.max(bottom, r.bottom);
+  }
+  if (left === Infinity) return null;
+  const x = Math.max(0, Math.floor(left + scrollX) - PADDING);
+  const y = Math.max(0, Math.floor(top + scrollY) - PADDING);
+  return {
+    x,
+    y,
+    width: Math.ceil(right + scrollX) + PADDING - x,
+    height: Math.ceil(bottom + scrollY) + PADDING - y,
+  };
+}
+
+/** A PNG data URI of what `root` shows, tight around its content; null when nothing drives the page or nothing shows. */
+export async function captureContent(
+  root: HTMLElement,
+): Promise<string | null> {
+  const screenshot = window[DOCS_BINDING];
+  const clip = contentClip(root);
+  if (!screenshot || !clip) return null;
+  return `data:image/png;base64,${await screenshot(clip)}`;
 }
 
 /** What a generated test component knows about where it came from. */

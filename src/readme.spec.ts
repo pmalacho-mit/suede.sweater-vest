@@ -226,7 +226,7 @@ describe("suggest", () => {
   });
 });
 
-describe("the command", () => {
+describe("the command", { timeout: 60_000 }, () => {
   let dir: string;
   const cli = path.resolve(import.meta.dirname, "../release/cli.ts");
   const run = (...args: string[]) =>

@@ -22,6 +22,7 @@
   import { fireEvent, screen, waitFor, within } from "@testing-library/svelte";
   import {
     capture,
+    captureContent,
     createHarness,
     loadVest,
     publish,
@@ -31,6 +32,12 @@
   } from "./common.svelte.ts";
 
   let { entry }: { entry: VestEntry } = $props();
+
+  // `?docs=start|end`: the documentation's screenshot of what the snippet shows,
+  // taken then. Only then is the snippet wrapped, to have something to measure.
+  const asked = new URLSearchParams(location.search).get("docs");
+  const docsMoment = asked === "start" || asked === "end" ? asked : null;
+  let root = $state<HTMLElement>();
 
   let mounted = $state<{
     Vest: Component<{ harness: Harness }>;
@@ -49,6 +56,10 @@
         fireEvent,
         waitFor,
         capture,
+        docs: docsMoment
+          ? async (when) =>
+              when === docsMoment && root ? captureContent(root) : null
+          : undefined,
       },
       entry.test,
     );
@@ -61,5 +72,9 @@
 </script>
 
 {#if mounted}
-  <mounted.Vest harness={mounted.harness} />
+  {#if docsMoment}
+    <div bind:this={root}><mounted.Vest harness={mounted.harness} /></div>
+  {:else}
+    <mounted.Vest harness={mounted.harness} />
+  {/if}
 {/if}

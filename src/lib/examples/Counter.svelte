@@ -11,7 +11,7 @@
 <output>{count}, doubled {doubled}</output>
 <button onclick={() => (count += step)} aria-label="increment">+</button>
 
-<!-- @docs: a bindable prop: the component writes back through the binding, and reads what the pocket writes -->
+<!-- @docs screenshot: a bindable prop: the component writes back through the binding, and reads what the pocket writes -->
 {#snippet binds(Counter: typeof Self, pocket: { count: Widen<5> }, test: Test)}
   <Counter bind:count={pocket.count} step={2} />
   {test(async ({ expect, user, screen, flushSync }) => {
