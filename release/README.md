@@ -430,6 +430,17 @@ node <path>/cli.ts src/lib/Counter.svelte counts --markdown          # one snipp
 node <path>/cli.ts src/lib --markdown --header-level 3 > docs.md     # every component under a directory
 ```
 
+```
+node <path>/cli.ts src/lib --markdown --marked                       # only snippets marked for the documentation
+node <path>/cli.ts src/lib --markdown --source-base https://github.com/o/r/blob/main
+```
+
+Mark a snippet for the documentation with a comment just above it that opens
+with `@docs`: `<!-- @docs: Counting up from two. -->` (the rest is its
+description). `--marked` then documents only those. Each snippet's heading is
+followed by a `[source](path#Lline)` link to the `{#snippet}` in the component;
+`--source-base` puts a prefix (a repository URL, say) before the path.
+
 Each snippet becomes a heading, the usage as a Svelte component, and — for a
 test — "Verified by" with the body of its test. A comment just above the
 snippet becomes a line between the heading and the usage:
@@ -474,10 +485,90 @@ and every import nothing refers to is dropped, the DSL's first. An example
 its snippets sit one level below. The editor extension shows the same for an
 extracted file.
 
+### Keeping a README up to date
+
+`--readme` writes the snippets into a README you also write by hand, and a re-run
+rewrites only what it wrote:
+
+```
+node <path>/cli.ts src/lib --readme src/lib/README.md [--marked] [--prune]
+node <path>/cli.ts --migrate src/lib/README.md --from "Old.svelte" --to "lib/New.svelte"
+```
+
+Each snippet sits between fences that name where it comes from — the component's
+path from the README's folder, and the snippet:
+
+```markdown
+<!-- sweater-vest:begin Counter.svelte > binds -->
+…generated…
+<!-- sweater-vest:end Counter.svelte > binds -->
+```
+
+That pair is the identity. A block already there is rewritten in place (edits
+inside it are overwritten; text outside is never touched); a new snippet goes
+after the last block of its component, or at the end; `--marked` and a named
+snippet limit what is written, and never make the rest stale. A block whose
+component or snippet no longer exists is reported and kept, with a suggested
+`--migrate` when the same snippet turns up elsewhere; `--prune` removes it.
+
+After you rename a component or a snippet, `--migrate` rewrites only the fences:
+`--from`/`--to` take a path (every block of that component) or
+`path > snippet` (one block). The next `--readme` refreshes what the blocks say.
+`--source-base` works as for `--markdown`; links are otherwise relative to the README.
+
+### Screenshots
+
+A snippet asks for one in its marker:
+
+```svelte
+<!-- @docs screenshot: counting up from two -->
+<!-- @docs screenshot=end: what it looks like once the test is through with it -->
+```
+
+`screenshot` is taken at the start of the test, `screenshot=end` after its body.
+It needs no `capture` call in the test: the page, opened with `?docs=`, photographs
+what the snippet shows (cropped to its content, at a fixed viewport, animations
+off, so an unchanged component gives the same PNG). It takes a running dev server and
+Chromium (`npx playwright install chromium`).
+
+```
+node <path>/cli.ts src/lib --readme src/lib/README.md --screenshots file:screenshots
+```
+
+`--screenshots` names a **hook**, which turns each PNG into the URL the README links to:
+
+| hook | answers |
+| --- | --- |
+| `inline` | a `data:` URI: nothing to host, a README that is mostly base64 |
+| `file:<dir>` | copies the PNG into `<dir>` (from the README's folder), a relative path |
+| `./my-hook.ts` | whatever your module's default export answers |
+
+```ts
+// my-hook.ts: (shot) => url | null, sync or async
+export default async ({ path, id, hash }) => {
+  await upload(path, `${id.snippet}-${hash}.png`);
+  return `https://cdn.example/${id.snippet}-${hash}.png`;
+};
+```
+
+`path` is a temporary PNG, removed when the hook returns; `id` is the component's
+path from the README's folder and the snippet (the fences' identity); `hash` is of
+the PNG's bytes. `null` leaves the snippet without an image; a throw reports that
+snippet and carries on.
+
+What each hook answered is remembered in `.derived/screenshots.json` (not
+committed), with a hash of the component's source. A component unchanged since,
+with the same hook, is neither photographed nor handed to the hook again —
+`--refresh` does both anyway. Without `--screenshots`, a README run still links
+the remembered URL, until the component changes. The hash covers the component
+file only, not what it imports: `--refresh` after changing a dependency. Images
+are written into the README only; `--markdown` does not link them.
+
 ## Where things are written
 
 `.derived/` inside this folder holds `diagnostics.json`: what the plugin could
-not hand in, by each component's absolute path, which the editor reads. It
+not hand in, by each component's absolute path, which the editor reads, and
+`screenshots.json`: what each documentation screenshot's hook answered. It
 ignores itself in git; delete it freely.
 
 When the dev server runs in a container whose port is published somewhere

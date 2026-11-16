@@ -34,6 +34,12 @@ export type Documented = {
   snippet: string;
   /** the comment just above the snippet */
   description: string | null;
+  /** the comment above the snippet opens with `@docs`: the author means it for the documentation */
+  marked: boolean;
+  /** `@docs screenshot` (or `screenshot=end`): when to photograph what the snippet shows */
+  screenshot: "start" | "end" | null;
+  /** 1-based line of the `{#snippet}`, for a link back to it */
+  line: number;
   /** a Svelte component: the usage */
   usage: string;
   /** the test body, when the snippet has a test */
@@ -147,6 +153,25 @@ const namesIn = (node: Node, skip: Set<Node>, into = new Set<string>()) => {
       into.add((n.name as string).split(".")[0]!);
   return into;
 };
+
+/**
+ * `@docs`, optionally `screenshot` (taken at the start of the test, or at its
+ * end as `screenshot=end`), optionally `: a description`.
+ */
+export function readMarker(comment: string) {
+  const m =
+    /^@docs\b(?:[ \t]+screenshot(?:=(start|end))?\b)?[ \t]*(?::[ \t]*)?/.exec(
+      comment,
+    );
+  if (!m) return { marked: false, screenshot: null, text: comment };
+  return {
+    marked: true,
+    screenshot: /screenshot/.test(m[0])
+      ? ((m[1] as "start" | "end" | undefined) ?? "start")
+      : null,
+    text: comment.slice(m[0].length),
+  };
+}
 
 const snippetNode = (source: string, snippet: TestSnippet): Node => {
   const ast = parse(source, { modern: true }) as unknown as {
@@ -321,8 +346,8 @@ export function document(
   const comment = above.endsWith("-->")
     ? above.slice(above.lastIndexOf("<!--") + 4, -3).trim()
     : "";
-  const description =
-    comment && !comment.startsWith("svelte-ignore") ? comment : null;
+  const { marked, screenshot, text } = readMarker(comment);
+  const description = text && !text.startsWith("svelte-ignore") ? text : null;
   const body = (node.body as { nodes: Node[] }).nodes;
   const subject = snippet.params.find((p) => p.kind === "subject")!;
   const test = snippet.params.find((p) => p.kind === "test")?.name ?? null;
@@ -483,6 +508,9 @@ export function document(
     name: `${stemOf(file)} > ${snippet.name}`,
     snippet: snippet.name,
     description,
+    marked,
+    screenshot,
+    line: snippet.line,
     usage,
     verifiedBy: hasTest(snippet) ? verifiedBy : null,
   };
@@ -492,11 +520,24 @@ const fence = (lang: string, code: string) =>
   `\`\`\`${lang}\n${code.replace(/\n$/, "")}\n\`\`\``;
 
 /** A snippet's section: its usage, then what verifies it. */
-export const markdownOf = (doc: Documented, level: number): string =>
+export const markdownOf = (
+  doc: Documented,
+  level: number,
+  /** where the component is, for a link from the heading to the snippet's line in it */
+  source?: string,
+  /** the heading's text, where the snippet's name alone would not say whose it is */
+  title: string = doc.snippet,
+  /** where a screenshot of it lives */
+  image?: string,
+): string =>
   [
-    `${"#".repeat(level)} ${doc.snippet}`,
+    `${"#".repeat(level)} ${title}`,
     "",
+    ...(source ? [`[source](${source}#L${doc.line})`, ""] : []),
     ...(doc.description ? [doc.description, ""] : []),
+    ...(image
+      ? [`![${title}](${/[\s()]/.test(image) ? `<${image}>` : image})`, ""]
+      : []),
     fence("svelte", doc.usage),
     ...(doc.verifiedBy
       ? ["", "Verified by:", "", fence("ts", doc.verifiedBy)]
@@ -509,11 +550,12 @@ export const markdownForComponent = (
   analysis: Analysis,
   docs: Documented[],
   level: number,
+  source?: string,
 ): string =>
   [
     `${"#".repeat(level)} ${stemOf(analysis.file)}`,
     "",
-    ...docs.map((d) => markdownOf(d, level + 1)),
+    ...docs.map((d) => markdownOf(d, level + 1, source)),
   ].join("\n");
 
 import type {

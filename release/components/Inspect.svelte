@@ -14,8 +14,9 @@
   const text = $derived(JSON.stringify($state.snapshot(value), seen, 2));
 </script>
 
+<!-- prettier-ignore -->
 <pre class="inspect">{#if label}<b>{label}</b>
-  {/if}{text}</pre>
+{/if}{text}</pre>
 
 <!-- a pocket beside what changes it: the view follows every write -->
 {#snippet usage(
